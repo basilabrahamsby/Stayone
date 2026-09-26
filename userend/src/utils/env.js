@@ -6,20 +6,19 @@ export const isPommaDeployment = () => {
   return path.startsWith("/pommaadmin") || path.startsWith("/pommaholidays");
 };
 
-export const isZeebullDeployment = () => {
+export const isStayoneDeployment = () => {
   if (typeof window === "undefined") {
     return false;
   }
   const path = window.location.pathname || "";
   const hostname = window.location.hostname || "";
-  // Check if it's the dedicated server IP or specific paths
   return (
     hostname === "34.71.114.198" ||
     hostname === "34.162.60.52" ||
-    hostname === "zeebull.com" ||
-    hostname === "www.zeebull.com" ||
-    path.startsWith("/zeebulladmin") ||
-    path.startsWith("/zeebull") ||
+    hostname === "stayone.com" ||
+    hostname === "www.stayone.com" ||
+    path.startsWith("/stayoneadmin") ||
+    path.startsWith("/stayone") ||
     path === "/"
   );
 };
@@ -33,7 +32,7 @@ export const isInventoryDeployment = () => {
 };
 
 export const getMediaBaseUrl = () => {
-  // For local development (localhost or 127.0.0.1 or LAN IP), always use port 8011 for Zeebull
+  // For local development (localhost or 127.0.0.1 or LAN IP), always use port 8011 for Stayone
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname || "";
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
@@ -45,8 +44,8 @@ export const getMediaBaseUrl = () => {
   if (typeof window !== "undefined" && isInventoryDeployment()) {
     return `${window.location.origin}/inventory`;
   }
-  if (typeof window !== "undefined" && isZeebullDeployment()) {
-    return `${window.location.origin}/zeebullfiles`;
+  if (typeof window !== "undefined" && isStayoneDeployment()) {
+    return `${window.location.origin}/stayonefiles`;
   }
   if (typeof window !== "undefined" && isPommaDeployment()) {
     return `${window.location.origin}/pomma`;
@@ -90,9 +89,9 @@ export const getApiBaseUrl = () => {
     console.log("Using Inventory deployment API URL:", apiUrl);
     return apiUrl;
   }
-  if (typeof window !== "undefined" && isZeebullDeployment()) {
-    const apiUrl = `${window.location.origin}/zeebullapi/api`;
-    console.log("Using Zeebull deployment API URL:", apiUrl);
+  if (typeof window !== "undefined" && isStayoneDeployment()) {
+    const apiUrl = `${window.location.origin}/stayoneapi/api`;
+    console.log("Using Stayone deployment API URL:", apiUrl);
     return apiUrl;
   }
   if (typeof window !== "undefined" && isPommaDeployment()) {

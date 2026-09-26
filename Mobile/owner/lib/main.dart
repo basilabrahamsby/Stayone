@@ -47,7 +47,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BranchProvider(apiService)),
       ],
       child: MaterialApp(
-        title: 'Zeebull',
+        title: 'StayOne',
         navigatorKey: navigatorKey,
         scaffoldMessengerKey: scaffoldMessengerKey,
         debugShowCheckedModeBanner: false,

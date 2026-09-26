@@ -35,10 +35,17 @@ export const usePermissions = () => {
   }, [token]);
 
   const { role, permissions, user } = authData;
-  const isSuperadmin = role === 'admin' || user?.is_superadmin;
+  const isSuperadmin = Boolean(user?.is_superadmin && !user?.branch_id);
+  const isBranchAdmin = Boolean(
+    user?.branch_id ||
+    role.includes('admin') || 
+    role.includes('owner') || 
+    role.includes('manager')
+  );
 
   const hasPermission = (permission) => {
     if (isSuperadmin) return true;
+    if (isBranchAdmin) return true;
     if (!permission) return true;
     
     const permsToCheck = Array.isArray(permission) ? permission : [permission];
@@ -81,6 +88,7 @@ export const usePermissions = () => {
 
   const hasModuleAccess = (moduleId) => {
     if (isSuperadmin) return true;
+    if (isBranchAdmin) return true;
     const ids = Array.isArray(moduleId) ? moduleId : [moduleId];
     
     return permissions.some(p => {
@@ -97,6 +105,16 @@ export const usePermissions = () => {
     });
   };
 
-  return { permissions, hasPermission, hasAnyPermission, hasModuleAccess, role, user, isSuperadmin, isAdmin: isSuperadmin };
+  return { 
+    permissions, 
+    hasPermission, 
+    hasAnyPermission, 
+    hasModuleAccess, 
+    role, 
+    user, 
+    isSuperadmin, 
+    isBranchAdmin, 
+    isAdmin: isSuperadmin || isBranchAdmin 
+  };
 };
 

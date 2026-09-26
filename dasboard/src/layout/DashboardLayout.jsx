@@ -26,15 +26,29 @@ import {
   Activity,
 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
-import zeebullLogo from "../assets/zeebulllogo.png";
+import stayoneLogo from "../assets/stayonelogo.png";
 import { NotificationBell } from "../contexts/NotificationContext";
 import { useBranch } from "../contexts/BranchContext";
 import { Building2, ChevronDown } from "lucide-react";
 import { usePermissions } from "../hooks/usePermissions";
 
-import { CreditCard } from "lucide-react";
+import { CreditCard, AlertCircle } from "lucide-react";
+import api from "../services/api";
 
 // Define professional, high-end themes with a focus on harmony and readability.
+const stayoneThemeConfig = {
+  '--bg-primary': '#faf8f5', // Soft cream/ivory background
+  '--bg-secondary': '#ffffff',
+  '--text-primary': '#2d3748', // Deep charcoal
+  '--text-secondary': '#718096', // Medium gray
+  '--accent-bg': '#e8f5e9', // Light stayone green
+  '--accent-text': '#2d5016', // Deep forest green
+  '--bubble-color': 'rgba(139, 195, 74, 0.25)', // Soft stayone green bubbles
+  '--primary-button': '#8bc34a', // Fresh stayone green
+  '--primary-button-hover': '#7cb342', // Darker stayone green
+  '--border-color': '#c5e1a5', // Light stayone green border
+};
+
 const themes = {
   'eco-friendly': {
     '--bg-primary': '#f0f7f4', // Soft mint green background
@@ -84,18 +98,7 @@ const themes = {
     '--primary-button-hover': '#b8945f',
     '--border-color': '#e8dcc6',
   },
-  'zeebull-signature': {
-    '--bg-primary': '#faf8f5', // Soft cream/ivory background
-    '--bg-secondary': '#ffffff',
-    '--text-primary': '#2d3748', // Deep charcoal
-    '--text-secondary': '#718096', // Medium gray
-    '--accent-bg': '#e8f5e9', // Light zeebull green
-    '--accent-text': '#2d5016', // Deep forest green
-    '--bubble-color': 'rgba(139, 195, 74, 0.25)', // Soft zeebull green bubbles
-    '--primary-button': '#8bc34a', // Fresh zeebull green
-    '--primary-button-hover': '#7cb342', // Darker zeebull green
-    '--border-color': '#c5e1a5', // Light zeebull green border
-  },
+  'stayone-signature': stayoneThemeConfig,
 };
 
 // Helper function to apply the theme's CSS variables to the document root
@@ -137,10 +140,14 @@ const routeToModuleMap = {
   "/report": ["reports_global", "reports"]
 };
 
-export const ProtectedRoute = ({ children, requiredPermission }) => {
-  const { isSuperadmin: isSuper, hasModuleAccess, permissions } = usePermissions();
+export const ProtectedRoute = ({ children, requiredPermission, superAdminOnly = false }) => {
+  const { isSuperadmin: isSuper, isBranchAdmin, hasModuleAccess, permissions } = usePermissions();
 
-  const hasAccess = isSuper || (requiredPermission ? hasModuleAccess(routeToModuleMap[requiredPermission] || requiredPermission) : true);
+  if (superAdminOnly && !isSuper) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const hasAccess = isSuper || isBranchAdmin || (requiredPermission ? hasModuleAccess(routeToModuleMap[requiredPermission] || requiredPermission) : true);
 
   if (!hasAccess) {
     return <div className="flex items-center justify-center h-screen text-red-600 font-bold text-xl">Access Denied: Insufficient Privileges</div>;
@@ -152,7 +159,7 @@ export const ProtectedRoute = ({ children, requiredPermission }) => {
 export default function DashboardLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const [currentTheme, setCurrentTheme] = useState('zeebull-signature'); // Default theme - zeebull-signature
+  const [currentTheme, setCurrentTheme] = useState('stayone-signature'); // Default theme - stayone-signature
 
   const navRef = useRef(null);
 
@@ -163,9 +170,9 @@ export default function DashboardLayout({ children }) {
       setCurrentTheme(savedTheme);
       applyTheme(savedTheme);
     } else {
-      // Set zeebull-signature as default theme
-      setCurrentTheme('zeebull-signature');
-      applyTheme('zeebull-signature');
+      // Set stayone-signature as default theme
+      setCurrentTheme('stayone-signature');
+      applyTheme('stayone-signature');
     }
   }, []);
 
@@ -200,7 +207,7 @@ export default function DashboardLayout({ children }) {
   }, [currentTheme]);
 
 
-  const { role, permissions, user, isSuperadmin: isSuper, hasModuleAccess } = usePermissions();
+  const { role, permissions, user, isSuperadmin: isSuper, isBranchAdmin, hasModuleAccess } = usePermissions();
   // Sync activeBranchId for non-superadmins and refresh branches on mount
   const { branches, activeBranchId, switchBranch, activeBranch, refreshBranches } = useBranch();
   
@@ -209,7 +216,7 @@ export default function DashboardLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    if (user && !user.is_superadmin && user.branch_id) {
+    if (user && user.branch_id) {
       if (activeBranchId.toString() !== user.branch_id.toString()) {
         switchBranch(user.branch_id);
       }
@@ -217,8 +224,49 @@ export default function DashboardLayout({ children }) {
   }, [user, activeBranchId, switchBranch]);
   const [showBranchMenu, setShowBranchMenu] = useState(false);
 
+  // Tenant subscription status for pending-approval banner
+  const [tenantProfile, setTenantProfile] = useState(null);
+  const [billingInfo, setBillingInfo] = useState(null);
+  const [showBillingModal, setShowBillingModal] = useState(false);
+  const [payingBill, setPayingBill] = useState(false);
+
+  useEffect(() => {
+    const fetchTenantProfile = async () => {
+      try {
+        const res = await api.get("/saas/tenant-profile");
+        setTenantProfile(res.data);
+      } catch (e) {
+        // Not a SaaS tenant or not authenticated — ignore
+      }
+    };
+    const fetchBilling = async () => {
+      try {
+        const res = await api.get("/saas/billing");
+        setBillingInfo(res.data);
+      } catch (e) { /* ignore */ }
+    };
+    fetchTenantProfile();
+    fetchBilling();
+  }, []);
+
+  const isPendingApproval = tenantProfile?.subscription_status === "pending_approval";
+
+  const handlePayBill = async () => {
+    setPayingBill(true);
+    try {
+      await api.post("/saas/pay-bill");
+      alert("✅ Payment recorded! Your billing is now up to date.");
+      const res = await api.get("/saas/billing");
+      setBillingInfo(res.data);
+    } catch (e) {
+      alert(e.response?.data?.detail || "Payment failed. Please try again.");
+    } finally {
+      setPayingBill(false);
+    }
+  };
+
   const allMenuItems = [
-    ...(user?.is_superadmin ? [{ label: "Enterprise Dashboard", icon: <Home size={18} />, to: "/superadmin-dashboard" }] : []),
+    ...(isSuper ? [{ label: "Enterprise Dashboard", icon: <Home size={18} />, to: "/superadmin-dashboard" }] : []),
     { label: "Dashboard", icon: <Home size={18} />, to: "/dashboard" },
     { label: "Finance", icon: <UserCircle size={18} />, to: "/account" },
     { label: "Bookings", icon: <CalendarCheck2 size={18} />, to: "/bookings" },
@@ -233,12 +281,13 @@ export default function DashboardLayout({ children }) {
     { label: "Inventory", icon: <Warehouse size={18} />, to: "/inventory" },
     { label: "Day Audit", icon: <CalendarCheck size={18} />, to: "/day-audit" },
     { label: "Settings", icon: <Settings size={18} />, to: "/settings" },
-    { label: "Branch Mgt", icon: <Building2 size={18} />, to: "/branch-management" },
+    ...(isSuper ? [{ label: "Branch Mgt", icon: <Building2 size={18} />, to: "/branch-management" }] : []),
     { label: "Activity Logs", icon: <Activity size={18} />, to: "/activity-logs" },
   ];
 
   const menuItems = allMenuItems.filter((item) => {
-    if (isSuper) return true;
+    // Both SuperAdmin and Branch Admin get all operational pages
+    if (isSuper || isBranchAdmin) return true;
     
     const moduleId = routeToModuleMap[item.to];
     if (!moduleId) return permissions.includes(item.to);
@@ -304,13 +353,13 @@ export default function DashboardLayout({ children }) {
             {/* Left side: App Logo and Branch Switcher */}
             <div className="flex flex-col items-center gap-4 w-full">
               <div className="p-0 rounded-xl flex items-center justify-center w-full">
-                <img src={zeebullLogo} className="h-32 md:h-40 w-auto object-contain drop-shadow-2xl" alt="Zeebull Hospitality Logo" />
+                <img src={stayoneLogo} className="h-32 md:h-40 w-auto object-contain drop-shadow-2xl" alt="Stayone Hospitality Logo" />
               </div>
 
               {/* Branch name/switcher section */}
               <div className="w-full mt-2">
-                {user?.is_superadmin ? (
-                  /* Branch Switcher for superadmins only */
+                {isSuper && !user?.branch_id && branches.length > 1 ? (
+                  /* Branch Switcher for universal superadmins only */
                   <div className="relative w-full">
                     <button
                       onClick={() => setShowBranchMenu(!showBranchMenu)}
@@ -392,13 +441,13 @@ export default function DashboardLayout({ children }) {
           {/* Theme Switcher UI with image previews */}
           <div className={`p-4 transition-all duration-300 flex justify-center gap-2 border-b`} style={{ borderColor: 'var(--accent-bg)' }}>
             <motion.button
-              animate={{ scale: currentTheme === 'zeebull-signature' ? 1.15 : 1, y: currentTheme === 'zeebull-signature' ? -2 : 0 }}
+              animate={{ scale: currentTheme === 'stayone-signature' ? 1.15 : 1, y: currentTheme === 'stayone-signature' ? -2 : 0 }}
               whileHover={{ scale: 1.2, y: -2 }} whileTap={{ scale: 1.1 }} transition={{ type: 'spring', stiffness: 300 }}
-              className={`w-8 h-8 rounded-full overflow-hidden ${currentTheme === 'zeebull-signature' ? 'shadow-lg border-2 border-[#8bc34a]' : ''}`}
-              onClick={() => { setCurrentTheme('zeebull-signature'); applyTheme('zeebull-signature'); }}
-              title="Zeebull Signature"
+              className={`w-8 h-8 rounded-full overflow-hidden ${currentTheme === 'stayone-signature' ? 'shadow-lg border-2 border-[#8bc34a]' : ''}`}
+              onClick={() => { setCurrentTheme('stayone-signature'); applyTheme('stayone-signature'); }}
+              title="Stayone Signature"
             >
-              <img src={zeebullLogo} alt="Zeebull Theme" className="w-full h-full object-cover" />
+              <img src={stayoneLogo} alt="Stayone Theme" className="w-full h-full object-cover" />
             </motion.button>
             <motion.button
               animate={{ scale: currentTheme === 'eco-friendly' ? 1.15 : 1, y: currentTheme === 'eco-friendly' ? -2 : 0 }}
@@ -519,6 +568,109 @@ export default function DashboardLayout({ children }) {
 
         {/* Main content area */}
         <main className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 lg:p-8 z-10 lg:ml-0 ml-0" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+
+          {/* Pending Approval Banner */}
+          {isPendingApproval && (
+            <div className="mb-4 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 flex items-start gap-3 shadow-sm">
+              <AlertCircle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold text-amber-800 text-sm">Registration Pending Approval</p>
+                <p className="text-amber-700 text-xs mt-0.5">Your property is under review by the StayOne admin team. Once approved, full app features will be unlocked. You can already view your monthly bill below.</p>
+              </div>
+              <button
+                onClick={() => setShowBillingModal(true)}
+                className="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <CreditCard size={14} /> View Bill
+              </button>
+            </div>
+          )}
+
+          {/* Monthly Bill floating button (always visible for non-superadmin tenants) */}
+          {tenantProfile && !isSuper && (
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setShowBillingModal(true)}
+                className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl shadow-sm transition-all hover:opacity-80"
+                style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--accent-text)', border: '1px solid var(--border-color)' }}
+              >
+                <CreditCard size={14} />
+                Monthly Bill
+                {billingInfo?.payment_status === 'unpaid' && (
+                  <span className="ml-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Billing Modal */}
+          {showBillingModal && (
+            <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-7">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="text-indigo-600" size={22} />
+                    <h2 className="text-xl font-bold text-gray-900">Property Billing</h2>
+                  </div>
+                  <button onClick={() => setShowBillingModal(false)} className="text-gray-400 hover:text-gray-700 text-xl font-bold">&times;</button>
+                </div>
+
+                {billingInfo ? (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Plan</span>
+                        <span className="font-semibold text-gray-900 capitalize">{billingInfo.plan || tenantProfile?.plan_code || 'starter'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Aiosell Branch Code</span>
+                        <span className="font-mono font-bold text-indigo-700">{billingInfo.branch_code || '—'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Monthly Fee</span>
+                        <span className="font-bold text-gray-900">₹{billingInfo.monthly_amount?.toLocaleString() || '—'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Status</span>
+                        <span className={`font-bold ${billingInfo.payment_status === 'paid' ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {billingInfo.payment_status === 'paid' ? '✅ Paid' : '⚠️ Unpaid'}
+                        </span>
+                      </div>
+                      {billingInfo.next_billing_date && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Next Billing Date</span>
+                          <span className="font-semibold text-gray-700">{billingInfo.next_billing_date}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Account Status</span>
+                        <span className={`font-bold capitalize ${
+                          billingInfo.subscription_status === 'active' ? 'text-emerald-600' :
+                          billingInfo.subscription_status === 'pending_approval' ? 'text-amber-600' : 'text-red-500'
+                        }`}>{billingInfo.subscription_status?.replace('_', ' ')}</span>
+                      </div>
+                    </div>
+
+                    {billingInfo.payment_status !== 'paid' && (
+                      <button
+                        onClick={handlePayBill}
+                        disabled={payingBill}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                      >
+                        {payingBill ? <>
+                          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                          Processing...
+                        </> : <><CreditCard size={16} /> Pay Monthly Bill</>}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-400">Loading billing info...</div>
+                )}
+              </div>
+            </div>
+          )}
+
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location.pathname}

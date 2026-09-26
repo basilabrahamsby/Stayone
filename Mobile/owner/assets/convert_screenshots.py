@@ -103,7 +103,7 @@ for i, f in enumerate(source_files):
     src_file_path = os.path.join(SOURCE_DIR, f)
     
     # 7-inch tablet: 1080 x 1920 (9:16 aspect ratio)
-    filename_7 = f"zeebull_tablet_7in_{i+1}.jpg"
+    filename_7 = f"stayone_tablet_7in_{i+1}.jpg"
     dest_path_7 = os.path.join(DEST_7_DIR, filename_7)
     create_tablet_screenshot(src_file_path, dest_path_7, 1080, 1920, 1550, 35)
     
@@ -111,7 +111,7 @@ for i, f in enumerate(source_files):
     shutil.copy(dest_path_7, os.path.join(ARTIFACTS_DIR, filename_7))
     
     # 10-inch tablet: 1620 x 2880 (9:16 aspect ratio)
-    filename_10 = f"zeebull_tablet_10in_{i+1}.jpg"
+    filename_10 = f"stayone_tablet_10in_{i+1}.jpg"
     dest_path_10 = os.path.join(DEST_10_DIR, filename_10)
     create_tablet_screenshot(src_file_path, dest_path_10, 1620, 2880, 2350, 50)
     

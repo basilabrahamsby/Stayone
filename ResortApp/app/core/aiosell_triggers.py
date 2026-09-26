@@ -185,11 +185,18 @@ def trigger_inventory_push(room_type_id: int, days: int = 180):
                 "end_date": start_date + timedelta(days=days - 1)
             })
             
+        from app.models.branch import Branch
+        branch_hotel_code = None
+        if room_type.branch_id:
+            br = db.query(Branch).filter(Branch.id == room_type.branch_id).first()
+            if br and br.code:
+                branch_hotel_code = br.code
+
         if batch_data:
-            success = batch_push_inventory(batch_data)
+            success = batch_push_inventory(batch_data, hotel_code=branch_hotel_code)
             status = "SUCCESS" if success else "FAILED"
-            print(f"[AIOSELL DEBUG] Inventory Push {status} for {room_type.name} ({len(batch_data)} segments)")
-            logger.info(f"[AIOSELL TRIGGER] Pushed inventory for {room_type.name} ({room_type.channel_manager_id}) for {days} days. Result: {status}")
+            print(f"[AIOSELL DEBUG] Inventory Push {status} for {room_type.name} (Hotel Code: {branch_hotel_code}, {len(batch_data)} segments)")
+            logger.info(f"[AIOSELL TRIGGER] Pushed inventory for {room_type.name} ({room_type.channel_manager_id}) hotel_code={branch_hotel_code} for {days} days. Result: {status}")
     except Exception as e:
         print(f"[AIOSELL ERROR] trigger_inventory_push failed: {e}")
         logger.error(f"Aiosell inventory trigger error: {e}")
@@ -239,6 +246,13 @@ def trigger_rates_push(room_type_id: int, days: int = 90):
             PricingCalendar.end_date >= start_date,
             PricingCalendar.start_date <= end_date
         ).all()
+
+        from app.models.branch import Branch
+        branch_hotel_code = None
+        if room_type.branch_id:
+            br = db.query(Branch).filter(Branch.id == room_type.branch_id).first()
+            if br and br.code:
+                branch_hotel_code = br.code
 
         for plan in rate_plans:
             if not plan.channel_manager_id: continue
@@ -321,11 +335,11 @@ def trigger_rates_push(room_type_id: int, days: int = 90):
                 })
 
             if batch_data:
-                success = batch_push_rates(batch_data)
+                success = batch_push_rates(batch_data, hotel_code=branch_hotel_code)
                 status = "SUCCESS" if success else "FAILED"
-                print(f"[AIOSELL DEBUG] Batch Rate Push {status} for Plan {plan.channel_manager_id}")
+                print(f"[AIOSELL DEBUG] Batch Rate Push {status} for Plan {plan.channel_manager_id} (Hotel Code: {branch_hotel_code})")
             
-        logger.info(f"[AIOSELL TRIGGER] Pushed dynamic rates for {room_type.name} ({len(rate_plans)} plans) for {days} days")
+        logger.info(f"[AIOSELL TRIGGER] Pushed dynamic rates for {room_type.name} ({len(rate_plans)} plans) hotel_code={branch_hotel_code} for {days} days")
 
 
     except Exception as e:
@@ -356,6 +370,13 @@ def trigger_restrictions_push(room_type_id: int, stop_sell: bool = False, min_st
             
         print(f"[AIOSELL DEBUG] Starting Restriction Push for {room_type.name} ({room_type.channel_manager_id}), StopSell={stop_sell}")
         
+        from app.models.branch import Branch
+        branch_hotel_code = None
+        if room_type.branch_id:
+            br = db.query(Branch).filter(Branch.id == room_type.branch_id).first()
+            if br and br.code:
+                branch_hotel_code = br.code
+
         from app.core.aiosell_client import push_restriction
         start = date.today()
         # Push restrictions for the next 180 days as per Aiosell best practices
@@ -367,7 +388,8 @@ def trigger_restrictions_push(room_type_id: int, stop_sell: bool = False, min_st
             end_date=end,
             stop_sell=stop_sell,
             min_stay=min_stay,
-            max_stay=max_stay
+            max_stay=max_stay,
+            hotel_code=branch_hotel_code
         )
         status = "SUCCESS" if success else "FAILED"
         print(f"[AIOSELL DEBUG] Restriction Push {status} for {room_type.name}")

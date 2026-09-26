@@ -367,19 +367,20 @@ export default function BranchManagement() {
                                                     value={formData.name}
                                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                                    placeholder="e.g., Zeebull Beach Resort"
+                                                    placeholder="e.g., Stayone Beach Resort"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Short Code</label>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Branch Code / Aiosell Hotel Code</label>
                                                 <input
                                                     type="text"
                                                     required
                                                     value={formData.code}
                                                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                                                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                                    placeholder="e.g., BEACH"
+                                                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono tracking-wider"
+                                                    placeholder="e.g., BEACH, MAIN, HCC001"
                                                 />
+                                                <p className="text-[11px] text-gray-400 mt-1">Used for Aiosell Channel Manager sync. Must match your Aiosell hotel code exactly.</p>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>

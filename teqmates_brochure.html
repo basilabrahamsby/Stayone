@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeqMates - Digital Solutions Provider | Executive Brochure</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #eff6ff;
+            --secondary: #0f172a;
+            --accent: #0284c7;
+            --accent-glow: #38bdf8;
+            --bg-light: #f8fafc;
+            --card-bg: #ffffff;
+            --text-dark: #0f172a;
+            --text-body: #334155;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --border-highlight: #cbd5e1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text-body);
+            background-color: #0b1120;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-dark);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        /* Page Layout - US Letter Size (8.5in x 11in) */
+        @page {
+            size: letter portrait;
+            margin: 0;
+        }
+
+        .page {
+            width: 8.5in;
+            height: 11in;
+            max-height: 11in;
+            padding: 0.42in 0.52in;
+            margin: 25px auto;
+            background: #ffffff;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
+            page-break-after: always;
+            break-after: page;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+            margin-bottom: 25px;
+        }
+
+        @media print {
+            body {
+                background: transparent !important;
+            }
+            .page {
+                margin: 0 !important;
+                box-shadow: none !important;
+                width: 8.5in !important;
+                height: 11in !important;
+                max-height: 11in !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                overflow: hidden !important;
+            }
+            .page:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+        }
+
+        /* Running Header & Footer */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1.5px solid var(--border-color);
+            padding-bottom: 8px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .page-header .brand-tag {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .page-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1.5px solid var(--border-color);
+            padding-top: 8px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .page-footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Section Headings */
+        .page-title-group {
+            margin-top: 10px;
+            margin-bottom: 14px;
+        }
+
+        .section-badge {
+            display: inline-block;
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 3px 10px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            border: 1px solid #bfdbfe;
+        }
+
+        .page-title-group h2 {
+            font-size: 1.65rem;
+            line-height: 1.2;
+            color: var(--secondary);
+            margin-bottom: 4px;
+        }
+
+        .page-title-group p {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* Cards and Grids */
+        .grid-2x3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: repeat(3, 1fr);
+            gap: 12px;
+            flex-grow: 1;
+            margin-bottom: 10px;
+        }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            flex-grow: 1;
+            margin-bottom: 10px;
+        }
+
+        .card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+        }
+
+        .card-header-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .card-icon {
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        .card h3 {
+            font-size: 1.02rem;
+            color: var(--secondary);
+            font-weight: 700;
+        }
+
+        .feature-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .feature-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px;
+            font-size: 0.79rem;
+            color: var(--text-body);
+            line-height: 1.35;
+        }
+
+        .feature-list li .check {
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 0.8rem;
+            line-height: 1.2;
+            flex-shrink: 0;
+        }
+
+        .feature-list li strong {
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        /* Cover Page Styling */
+        .page-cover {
+            background: linear-gradient(145deg, #090e1a 0%, #0f172a 45%, #1e3a8a 100%);
+            color: #ffffff;
+            padding: 0.6in 0.65in;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        .page-cover::before {
+            content: '';
+            position: absolute;
+            top: -10%;
+            right: -10%;
+            width: 450px;
+            height: 450px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .page-cover::after {
+            content: '';
+            position: absolute;
+            bottom: -5%;
+            left: -5%;
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.2) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .cover-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .logo-box {
+            background: #ffffff;
+            padding: 10px 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .logo-box img {
+            height: 65px;
+            width: auto;
+            display: block;
+        }
+
+        .cover-doc-type {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--accent-glow);
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 6px 14px;
+            border-radius: 20px;
+        }
+
+        .cover-hero-content {
+            margin: auto 0;
+            position: relative;
+            z-index: 2;
+        }
+
+        .cover-pill {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #93c5fd;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 50px;
+            margin-bottom: 18px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .page-cover h1 {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-size: 3.2rem;
+            line-height: 1.08;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        .page-cover .subtitle {
+            color: var(--accent-glow) !important;
+            -webkit-text-fill-color: var(--accent-glow) !important;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 22px;
+        }
+
+        .page-cover .desc {
+            color: #cbd5e1 !important;
+            -webkit-text-fill-color: #cbd5e1 !important;
+            font-size: 0.96rem;
+            line-height: 1.6;
+            max-width: 620px;
+            margin-bottom: 30px;
+        }
+
+        .cover-features-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .cover-stat-box {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 14px;
+        }
+
+        .cover-stat-box h4 {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .cover-stat-box p {
+            color: #94a3b8 !important;
+            -webkit-text-fill-color: #94a3b8 !important;
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+
+        .cover-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            padding-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.82rem;
+            color: #cbd5e1 !important;
+            -webkit-text-fill-color: #cbd5e1 !important;
+            position: relative;
+            z-index: 2;
+        }
+
+        .cover-contact-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .cover-contact-links a {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Highlight Boxes for Pricing */
+        .pricing-hero-card {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 2px solid #3b82f6;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+        }
+
+        .pricing-tag {
+            background: var(--primary);
+            color: #ffffff;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-block;
+            margin-bottom: 6px;
+        }
+
+        .pricing-hero-card h3 {
+            font-size: 1.15rem;
+            color: #1e3a8a;
+            margin-bottom: 6px;
+        }
+
+        .pricing-hero-card p {
+            font-size: 0.82rem;
+            color: #1e293b;
+            line-height: 1.45;
+        }
+
+        .pricing-subcard {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+        }
+
+        .pricing-subcard h4 {
+            font-size: 0.95rem;
+            color: var(--secondary);
+            margin-bottom: 4px;
+        }
+
+        .pricing-subcard p {
+            font-size: 0.8rem;
+            color: var(--text-body);
+            line-height: 1.35;
+        }
+
+        /* Portfolio Cards */
+        .portfolio-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+            border-top: 3px solid var(--primary);
+        }
+
+        .portfolio-card h3 {
+            font-size: 1.15rem;
+            color: var(--secondary);
+            margin-bottom: 4px;
+        }
+
+        .portfolio-card .client-category {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .portfolio-card p {
+            font-size: 0.82rem;
+            color: var(--text-body);
+            line-height: 1.4;
+            margin-bottom: 12px;
+        }
+
+        .portfolio-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border-color);
+            padding-top: 8px;
+            margin-top: auto;
+        }
+
+        .badge-app {
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .visit-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.78rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Workflow Steps */
+        .workflow-box {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .workflow-num {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #ffffff;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.95rem;
+            font-family: 'Outfit', sans-serif;
+            flex-shrink: 0;
+        }
+
+        .workflow-box h4 {
+            font-size: 0.92rem;
+            color: var(--secondary);
+            margin-bottom: 3px;
+        }
+
+        .workflow-box p {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+
+        /* Executive CTA Banner on Page 6 */
+        .cta-banner {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+            border-radius: 12px;
+            padding: 18px 24px;
+            color: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .cta-banner h3 {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-size: 1.25rem;
+            margin-bottom: 4px;
+        }
+
+        .cta-banner p {
+            color: #93c5fd !important;
+            -webkit-text-fill-color: #93c5fd !important;
+            font-size: 0.82rem;
+        }
+
+        .cta-contacts {
+            text-align: right;
+            font-size: 0.8rem;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            line-height: 1.5;
+        }
+
+        .cta-contacts a {
+            color: var(--accent-glow) !important;
+            -webkit-text-fill-color: var(--accent-glow) !important;
+            text-decoration: none;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ================= PAGE 1: EXECUTIVE COVER ================= -->
+    <div class="page page-cover">
+        <div class="cover-top">
+            <div class="logo-box">
+                <img src="logo.jpg" alt="TeqMates Logo">
+            </div>
+            <div class="cover-doc-type">
+                Executive Technology Proposal
+            </div>
+        </div>
+
+        <div class="cover-hero-content">
+            <div class="cover-pill">Enterprise Software & Digital Architecture</div>
+            <h1>TeqMates</h1>
+            <div class="subtitle">Digital Solutions Provider</div>
+            <p class="desc">
+                Architecting next-generation technology solutions — spanning high-performance web platforms, cross-platform mobile apps, and full-scale enterprise software. Whether foundational tools or complex hospitality management, we deliver resilient, high-impact systems.
+            </p>
+
+            <div class="cover-features-bar">
+                <div class="cover-stat-box">
+                    <h4>Custom Engineering</h4>
+                    <p>Tailored web & mobile architectures built for scale, security, and speed.</p>
+                </div>
+                <div class="cover-stat-box">
+                    <h4>Resort & Hospitality PMS</h4>
+                    <p>End-to-end management covering reservations, billing, accounting & GST.</p>
+                </div>
+                <div class="cover-stat-box">
+                    <h4>Modular Flexibility</h4>
+                    <p>Pay only for customer-needed modules with transparent, one-time licensing.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="cover-bottom">
+            <div>
+                <strong>TeqMates Technologies</strong> &bull; Kerala & Karnataka, India
+            </div>
+            <div class="cover-contact-links">
+                <span>📞 +91 99612 39861</span>
+                <span>📞 +91 90358 10416</span>
+                <a href="https://teqmates.com/" target="_blank">🌐 teqmates.com</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= PAGE 2: RESORT MANAGEMENT - CORE OPERATIONS ================= -->
+    <div class="page">
+        <div class="page-header">
+            <span><span class="brand-tag">TeqMates</span> &bull; Resort & Hospitality Management PMS</span>
+            <span>Module Overview • Part 1</span>
+        </div>
+
+        <div class="page-title-group">
+            <div class="section-badge">Flagship Enterprise Solution</div>
+            <h2>Complete Hospitality & Resort Management</h2>
+            <p>An integrated, all-in-one ecosystem engineered to streamline front-desk operations, automate billing, and deliver superior guest service.</p>
+        </div>
+
+        <div class="grid-2x3">
+            <!-- Module 1 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">🛏️</span>
+                    <h3>Booking & Reservation</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Room Bookings:</strong> Single & multi-room reservations with instant confirmation.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Live Availability Grid:</strong> Real-time status visualizer across room types.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Advance Deposits:</strong> Automated tracking and adjustment at checkout.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Guest Profiles:</strong> Stay history, preferences, VIP tags, and total lifetime spend.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 2 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">💳</span>
+                    <h3>Checkout & Billing</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Pre-Checkout Audit:</strong> Housekeeping & room inspection clearance validation.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Unified Folio:</strong> Auto-aggregates room tariffs, F&B, spa, and services.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Split Payments:</strong> Multi-mode settlements (Cash, Card, UPI, Corporate).</div></li>
+                    <li><span class="check">✓</span> <div><strong>B2B Billing:</strong> Corporate invoices with company GSTIN and tax breakdowns.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 3 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">📦</span>
+                    <h3>Inventory & Asset Control</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Multi-Location Stock:</strong> Track Main Stores, Kitchens, and Housekeeping linen.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Purchase Orders:</strong> Direct PO generation, vendor approval, and goods receipt.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Fixed Asset Registry:</strong> Equipment serial tracking and depreciation logs.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Variance Audits:</strong> Auto-calculates stock consumption vs. physical counts.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 4 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">🍽️</span>
+                    <h3>Food & Beverage (F&B)</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Digital Restaurant Menu:</strong> Dynamic categories, daily specials, and pricing.</div></li>
+                    <li><span class="check">✓</span> <div><strong>In-Room Dining:</strong> Orders instantly billed to guest room folios or tables.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Recipe Engine:</strong> Food preparation auto-deducts kitchen raw ingredients.</div></li>
+                    <li><span class="check">✓</span> <div><strong>F&B Analytics:</strong> Fast-moving items, daily covers, and margin reports.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 5 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">🧹</span>
+                    <h3>Services & Housekeeping</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Service Catalog:</strong> Spa treatments, guided tours, laundry, and transport.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Staff Task Board:</strong> Assign cleaning with priority tags and SLA timers.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Real-Time Room Status:</strong> Clean, Dirty, Inspected, and Out of Service.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Seamless Billing:</strong> Completed service charges auto-post to guest bill.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 6 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">👥</span>
+                    <h3>Employee & HR Management</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Attendance Tracking:</strong> Digital shift clock-in / clock-out logging.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Leave Management:</strong> Leave requests, multi-level approvals, and balance logs.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Payroll Processing:</strong> Monthly wage calculations, deductions, and pay slips.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Role-Based Access:</strong> Granular permissions per staff member across modules.</div></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>TeqMates &bull; Digital Solutions Provider &bull; <a href="https://teqmates.com/">teqmates.com</a></span>
+            <span>Page 2 of 6</span>
+        </div>
+    </div>
+
+    <!-- ================= PAGE 3: RESORT MANAGEMENT - FINANCE & CHANNELS ================= -->
+    <div class="page">
+        <div class="page-header">
+            <span><span class="brand-tag">TeqMates</span> &bull; Resort & Hospitality Management PMS</span>
+            <span>Module Overview • Part 2</span>
+        </div>
+
+        <div class="page-title-group">
+            <div class="section-badge">Compliance, Integrations & Mobility</div>
+            <h2>Financial Intelligence & Channel Distribution</h2>
+            <p>Enterprise accounting, strict Indian GST compliance, multi-property oversight, and real-time OTA synchronization.</p>
+        </div>
+
+        <div class="grid-2x3">
+            <!-- Module 7 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">📊</span>
+                    <h3>Built-In Accounting</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Double-Entry Ledger:</strong> Automatic balanced journal entries for all sales.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Chart of Accounts:</strong> 42 pre-configured ledgers spanning 7 core groups.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Financial Statements:</strong> Real-time Profit & Loss, Balance Sheet & Trial Balance.</div></li>
+                    <li><span class="check">✓</span> <div><strong>One-Click Export:</strong> Export clean records to Excel, CSV, or formatted PDF.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 8 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">🧾</span>
+                    <h3>India GST Tax Engine</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Smart Tax Slabs:</strong> Automated tariff-based 5%, 12%, or 18% CGST/SGST/IGST.</div></li>
+                    <li><span class="check">✓</span> <div><strong>ITC Tracking:</strong> Input Tax Credit tracking on vendor purchases and expenses.</div></li>
+                    <li><span class="check">✓</span> <div><strong>RCM Support:</strong> Comprehensive Reverse Charge Mechanism compliance.</div></li>
+                    <li><span class="check">✓</span> <div><strong>8 Statutory Reports:</strong> Ready-to-file B2B/B2C, HSN/SAC, and ITC summaries.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 9 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">📈</span>
+                    <h3>Executive Reports & Analytics</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Live Executive Dashboard:</strong> Real-time RevPAR, ADR, and daily revenue.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Audit Trail:</strong> Tamper-evident activity logs recording every system action.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Operational Insights:</strong> Predictive occupancy curves and peak demand periods.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Instant Alerts:</strong> SMS/Email triggers for cancellations and VIP arrivals.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 10 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">📱</span>
+                    <h3>Mobile Apps Ecosystem</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Owner App:</strong> Real-time financial reports and approvals directly from mobile.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Staff App:</strong> Housekeeping task updates, room readiness, and guest tickets.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Guest App:</strong> Contactless check-in, dining orders, and amenity requests.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Push Notifications:</strong> Instant alerts for booking changes and alerts.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 11 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">🌐</span>
+                    <h3>Multi-Property Management</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>Centralized Portal:</strong> Manage multiple resorts and hotels from one login.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Group Analytics:</strong> Compare branch performance and consolidated revenue.</div></li>
+                    <li><span class="check">✓</span> <div><strong>White-Label Ready:</strong> Custom logos, colors, and domain per property.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Data Isolation:</strong> Secure data partitioning ensures confidentiality.</div></li>
+                </ul>
+            </div>
+
+            <!-- Module 12 -->
+            <div class="card">
+                <div class="card-header-row">
+                    <span class="card-icon">🔄</span>
+                    <h3>Channel Manager Integration</h3>
+                </div>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span> <div><strong>2-Way OTA Sync:</strong> Auto-syncs rates and inventory with Booking.com, Agoda.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Overbooking Elimination:</strong> Live updates ensure zero double bookings.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Unified Rate Plans:</strong> Update seasonal tariffs across all channels at once.</div></li>
+                    <li><span class="check">✓</span> <div><strong>Automated Import:</strong> OTA bookings flow directly into the front-desk folio.</div></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>TeqMates &bull; Digital Solutions Provider &bull; <a href="https://teqmates.com/">teqmates.com</a></span>
+            <span>Page 3 of 6</span>
+        </div>
+    </div>
+
+    <!-- ================= PAGE 4: MOBILE & MODULAR PRICING ================= -->
+    <div class="page">
+        <div class="page-header">
+            <span><span class="brand-tag">TeqMates</span> &bull; Ecosystem Architecture & Licensing</span>
+            <span>Flexible Investment Model</span>
+        </div>
+
+        <div class="page-title-group">
+            <div class="section-badge">Client-Centric Pricing</div>
+            <h2>Mobile Applications & Modular Licensing</h2>
+            <p>Empower your entire workforce on mobile while enjoying a fair, modular pricing model tailored to your exact operational requirements.</p>
+        </div>
+
+        <div class="grid-2col">
+            <!-- Left Column: Mobile Ecosystem -->
+            <div>
+                <h3 style="font-size: 1.15rem; margin-bottom: 12px; color: var(--secondary);">Integrated Mobile Apps</h3>
+                
+                <div class="card" style="margin-bottom: 12px;">
+                    <div class="card-header-row">
+                        <span class="card-icon">📱</span>
+                        <h3>Resort Owner App</h3>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-body); line-height: 1.4;">
+                        Designed for executives and resort owners. Monitor real-time occupancy, track daily cash flow, review revenue breakdowns, and authorize high-value purchase orders securely from anywhere in the world.
+                    </p>
+                </div>
+
+                <div class="card" style="margin-bottom: 12px;">
+                    <div class="card-header-row">
+                        <span class="card-icon">🛎️</span>
+                        <h3>Staff & Operations App</h3>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-body); line-height: 1.4;">
+                        Empowers front-desk, housekeeping, and maintenance teams. Staff can update room statuses in real-time, accept guest service requests, log maintenance issues, and track checklists on their smartphones.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header-row">
+                        <span class="card-icon">✨</span>
+                        <h3>Guest Experience App</h3>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-body); line-height: 1.4;">
+                        A branded mobile interface for resort guests. Enables direct room reservation, digital restaurant browsing, in-room service orders, spa bookings, and instant bill previews for seamless contactless luxury.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right Column: Investment Structure -->
+            <div>
+                <h3 style="font-size: 1.15rem; margin-bottom: 12px; color: var(--secondary);">Transparent Investment Model</h3>
+
+                <!-- Highlighted Modular Pricing Card -->
+                <div class="pricing-hero-card">
+                    <div class="pricing-tag">Core Guarantee</div>
+                    <h3>Pay Only For What You Need</h3>
+                    <p>
+                        We reject rigid, expensive software bundles. <strong>You pay strictly for the specific modules and sections your resort requires.</strong> Whether you only need Booking & Billing today or a complete ERP with Accounting and Channel Manager tomorrow, your software scales with your business without wasted expenditure.
+                    </p>
+                </div>
+
+                <div class="pricing-subcard">
+                    <h4>💼 One-Time Settlement</h4>
+                    <p>
+                        Enjoy financial peace of mind with a transparent one-time deployment fee for chosen modules. No hidden licensing traps or forced monthly subscriptions — you own your software deployment.
+                    </p>
+                </div>
+
+                <div class="pricing-subcard">
+                    <h4>🛠️ Annual Support & Maintenance (Optional)</h4>
+                    <p>
+                        Ensure long-term system health, automatic cloud backups, continuous security patches, statutory GST updates, and prioritized technical support with our optional yearly maintenance packages.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>TeqMates &bull; Digital Solutions Provider &bull; <a href="https://teqmates.com/">teqmates.com</a></span>
+            <span>Page 4 of 6</span>
+        </div>
+    </div>
+
+    <!-- ================= PAGE 5: FEATURED PORTFOLIO ================= -->
+    <div class="page">
+        <div class="page-header">
+            <span><span class="brand-tag">TeqMates</span> &bull; Verified Client Portfolio</span>
+            <span>Proven Track Record</span>
+        </div>
+
+        <div class="page-title-group">
+            <div class="section-badge">Real-World Deployments</div>
+            <h2>Featured Clients & Live Platforms</h2>
+            <p>Explore a selection of mission-critical web platforms, e-commerce marketplaces, and mobile ecosystems delivered by TeqMates.</p>
+        </div>
+
+        <div class="grid-2x3">
+            <!-- Client 1 -->
+            <div class="portfolio-card">
+                <div>
+                    <h3>Zeebull</h3>
+                    <div class="client-category">Hospitality & Travel Management</div>
+                    <p>Comprehensive travel booking, resort operations, and customer itinerary management platform built for modern hospitality brands.</p>
+                </div>
+                <div class="portfolio-card-footer">
+                    <span class="badge-app">Web & Mobile Apps</span>
+                    <a href="https://zeebull.com" target="_blank" class="visit-link">Visit Website &rarr;</a>
+                </div>
+            </div>
+
+            <!-- Client 2 -->
+            <div class="portfolio-card">
+                <div>
+                    <h3>Pomma Holidays</h3>
+                    <div class="client-category">Premium Tour & Booking Platform</div>
+                    <p>High-performance travel portal featuring real-time tour package booking, dynamic pricing algorithms, and integrated payment gateways.</p>
+                </div>
+                <div class="portfolio-card-footer">
+                    <span class="badge-app">Web & Mobile Apps</span>
+                    <a href="https://pommaholidays.com" target="_blank" class="visit-link">Visit Website &rarr;</a>
+                </div>
+            </div>
+
+            <!-- Client 3 -->
+            <div class="portfolio-card">
+                <div>
+                    <h3>KozmoCart</h3>
+                    <div class="client-category">Dynamic E-Commerce Marketplace</div>
+                    <p>High-volume multi-vendor marketplace platform with fast-loading product catalogs, robust inventory tracking, and seamless checkout.</p>
+                </div>
+                <div class="portfolio-card-footer">
+                    <span class="badge-app">Web & Mobile Apps</span>
+                    <a href="https://kozmocart.com" target="_blank" class="visit-link">Visit Website &rarr;</a>
+                </div>
+            </div>
+
+            <!-- Client 4 -->
+            <div class="portfolio-card">
+                <div>
+                    <h3>PommaStore</h3>
+                    <div class="client-category">Retail & Digital Storefront</div>
+                    <p>Modern e-commerce retail platform bridging physical retail inventory with a seamless digital shopping experience and instant delivery tracking.</p>
+                </div>
+                <div class="portfolio-card-footer">
+                    <span class="badge-app">Web & Mobile Apps</span>
+                    <a href="https://pommastore.com" target="_blank" class="visit-link">Visit Website &rarr;</a>
+                </div>
+            </div>
+
+            <!-- Client 5 -->
+            <div class="portfolio-card">
+                <div>
+                    <h3>Liwara Perfumes</h3>
+                    <div class="client-category">Luxury Fragrance Brand Store</div>
+                    <p>Sophisticated, high-aesthetic e-commerce experience crafted for luxury fragrance collections, featuring international multi-currency checkouts.</p>
+                </div>
+                <div class="portfolio-card-footer">
+                    <span class="badge-app">Web & Mobile Apps</span>
+                    <a href="https://liwaraperfumes.com/" target="_blank" class="visit-link">Visit Website &rarr;</a>
+                </div>
+            </div>
+
+            <!-- Custom Solutions -->
+            <div class="portfolio-card" style="border-top-color: #0284c7; background: #f8fafc;">
+                <div>
+                    <h3>Bespoke Engineering</h3>
+                    <div class="client-category">Custom Software & Cloud Systems</div>
+                    <p>Need a custom solution? We engineer scalable RESTful APIs, enterprise web applications, and iOS/Android mobile apps designed to your exact specs.</p>
+                </div>
+                <div class="portfolio-card-footer">
+                    <span class="badge-app">Custom Architecture</span>
+                    <a href="https://teqmates.com/" target="_blank" class="visit-link">Explore More &rarr;</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>TeqMates &bull; Digital Solutions Provider &bull; <a href="https://teqmates.com/">teqmates.com</a></span>
+            <span>Page 5 of 6</span>
+        </div>
+    </div>
+
+    <!-- ================= PAGE 6: DEVELOPMENT PROCESS & CONTACT ================= -->
+    <div class="page">
+        <div class="page-header">
+            <span><span class="brand-tag">TeqMates</span> &bull; Methodology & Project Delivery</span>
+            <span>Partner With Us</span>
+        </div>
+
+        <div class="page-title-group">
+            <div class="section-badge">Agile Delivery Framework</div>
+            <h2>Our Development Process</h2>
+            <p>A structured, transparent engineering lifecycle designed to ensure on-time delivery, robust quality, and smooth staff adoption.</p>
+        </div>
+
+        <div class="grid-2x3" style="margin-bottom: 12px;">
+            <!-- Step 1 -->
+            <div class="workflow-box">
+                <div class="workflow-num">1</div>
+                <div>
+                    <h4>Requirement Gathering</h4>
+                    <p>In-depth discovery to map your operational workflows, pain points, and specific module needs.</p>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="workflow-box">
+                <div class="workflow-num">2</div>
+                <div>
+                    <h4>UI/UX Design & Prototype</h4>
+                    <p>Interactive prototypes and intuitive mockups guaranteeing that staff can use the system with ease.</p>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="workflow-box">
+                <div class="workflow-num">3</div>
+                <div>
+                    <h4>Agile Sprint Development</h4>
+                    <p>Iterative development with regular progress updates and demo sessions for continuous feedback.</p>
+                </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="workflow-box">
+                <div class="workflow-num">4</div>
+                <div>
+                    <h4>Rigorous QA & Testing</h4>
+                    <p>End-to-end functional testing, performance benchmarks, and security validations across all devices.</p>
+                </div>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="workflow-box">
+                <div class="workflow-num">5</div>
+                <div>
+                    <h4>Deployment & Training</h4>
+                    <p>Smooth server deployment, data migration, and hands-on onboarding sessions for your management and staff.</p>
+                </div>
+            </div>
+
+            <!-- Step 6 -->
+            <div class="workflow-box">
+                <div class="workflow-num">6</div>
+                <div>
+                    <h4>Continuous Support & SLA</h4>
+                    <p>Proactive maintenance, automated backups, and dedicated priority support to keep your business running 24/7.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Executive CTA Banner -->
+        <div class="cta-banner">
+            <div>
+                <h3>Ready to Transform Your Business?</h3>
+                <p>Let's architect the right technology solution tailored to your exact scale.</p>
+            </div>
+            <div class="cta-contacts">
+                <div>🌐 <a href="https://teqmates.com/" target="_blank">teqmates.com</a></div>
+                <div>📞 +91 99612 39861 &nbsp;|&nbsp; +91 90358 10416</div>
+                <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 4px;">&copy; 2026 TeqMates Technologies. All Rights Reserved.</div>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>TeqMates &bull; Digital Solutions Provider &bull; <a href="https://teqmates.com/">teqmates.com</a></span>
+            <span>Page 6 of 6</span>
+        </div>
+    </div>
+
+</body>
+</html>

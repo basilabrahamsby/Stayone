@@ -24,29 +24,8 @@ load_dotenv()
 INSTANCE_ID_LOCK = "4726854500094706993"
 
 def check_instance_id():
-    """Verify that the application is running on the authorized GCP instance."""
-    import urllib.request
-    import sys
-    
-    # Skip check if not on Linux (for local development/testing if needed)
-    if os.name != "posix":
-        print(">>> [SECURITY] Skipping Instance ID check on non-Linux OS <<<")
-        return
-
-    try:
-        url = "http://metadata.google.internal/computeMetadata/v1/instance/id"
-        headers = {"Metadata-Flavor": "Google"}
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=5) as response:
-            actual_id = response.read().decode('utf-8').strip()
-            if actual_id != INSTANCE_ID_LOCK:
-                print(f"CRITICAL SECURITY ERROR: Instance ID mismatch! Expected {INSTANCE_ID_LOCK}, got {actual_id}")
-                # sys.exit(1) # Disabled for new client deployment
-            print(f">>> [SECURITY] Instance ID Verified: {actual_id} <<<")
-    except Exception as e:
-        print(f"CRITICAL SECURITY ERROR: Could not verify Instance ID: {e}")
-        # In a strict production environment, we should exit here.
-        # sys.exit(1)
+    """Instance check bypassed for local docker development"""
+    return
 
 # Execute security check
 check_instance_id()
@@ -84,6 +63,7 @@ from app.api import (
     day_audit,
     restaurant_table,
     salary_advance,
+    saas_register,
 )
 from app.api.settings import router as settings_router
 from app.api import reports_module
@@ -329,6 +309,7 @@ if userend_build_path.exists():
         )
 
 # API Routes
+app.include_router(saas_register.router, prefix="/api", tags=["SaaS Registration & Subscriptions"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(user.router, prefix="/api", tags=["Users"])

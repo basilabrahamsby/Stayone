@@ -13,6 +13,8 @@ from app.schemas.room import RoomCreate, RoomOut
 from app.curd import room as crud_room
 from app.models.room import Room, RoomType
 from app.models.booking import Booking, BookingRoom
+from app.models.branch import Branch
+from app.models.tenant import Tenant
 import shutil
 from app.utils.branch_scope import get_branch_id
 from app.models.user import User
@@ -487,6 +489,19 @@ def create_room_test(
         effective_branch_id = getattr(current_user, "branch_id", None) or 1
 
     try:
+        # Enforce SaaS Plan room quota for tenant
+        if not getattr(current_user, "is_superadmin", False):
+            branch_obj = db.query(Branch).filter(Branch.id == effective_branch_id).first()
+            if branch_obj and branch_obj.tenant_id:
+                tenant_obj = db.query(Tenant).filter(Tenant.id == branch_obj.tenant_id).first()
+                if tenant_obj and tenant_obj.plan and tenant_obj.plan.max_rooms:
+                    active_rooms_count = db.query(Room).filter(Room.branch_id == effective_branch_id).count()
+                    if active_rooms_count >= tenant_obj.plan.max_rooms:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Room limit reached for your plan ({tenant_obj.plan.max_rooms} rooms). Please upgrade your subscription to add more rooms."
+                        )
+
         # Check if room number already exists in this branch
         existing_room = db.query(Room).filter(Room.number == number, Room.branch_id == effective_branch_id).first()
 
@@ -1087,7 +1102,8 @@ def get_room_stats(db: Session = Depends(get_db), branch_id: int = Depends(get_b
 def get_room_inventory_usage(
     room_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
     """
     Get inventory usage history for a specific room.
@@ -1098,6 +1114,8 @@ def get_room_inventory_usage(
         room = db.query(Room).filter(Room.id == room_id).first()
         if not room:
             raise HTTPException(status_code=404, detail="Room not found")
+        if branch_id is not None and room.branch_id != branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this room")
         
         # Get inventory transactions for this room's location
         if not room.inventory_location_id:
@@ -1141,7 +1159,8 @@ def get_room_inventory_usage(
 def get_room_activity_log(
     room_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
     """
     Get complete activity log for a specific room including:
@@ -1155,6 +1174,9 @@ def get_room_activity_log(
         room = db.query(Room).filter(Room.id == room_id).first()
         if not room:
             raise HTTPException(status_code=404, detail="Room not found")
+        if branch_id is not None and room.branch_id != branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this room")
+
         
         activities = []
         

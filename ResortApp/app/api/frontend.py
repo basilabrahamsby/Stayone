@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
 from sqlalchemy.orm import Session, joinedload
+from typing import Optional
 import os
 import shutil
 import uuid
@@ -9,9 +10,51 @@ import app.models.frontend as models
 from app.models.user import User
 import app.curd.frontend as crud
 import json
-from app.utils.auth import get_db, get_current_user
+from app.utils.auth import get_db, get_current_user, decode_token
 
 router = APIRouter()
+
+def resolve_frontend_branch(
+    request: Request,
+    db: Session,
+    query_branch_id: Optional[int] = None
+) -> Optional[int]:
+    """
+    Resolves branch ID for frontend endpoints:
+    1. If user is authenticated via Bearer token:
+       - If branch assigned: STRICTLY return user.branch_id.
+       - If superadmin: return X-Branch-ID (or None for all).
+    2. If unauthenticated public request:
+       - Fall back to X-Branch-ID header or query_branch_id.
+    """
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            payload = decode_token(token)
+            user_id = payload.get("user_id")
+            if user_id:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user:
+                    if getattr(user, 'branch_id', None) is not None:
+                        return user.branch_id
+                    x_branch = request.headers.get("X-Branch-ID")
+                    if x_branch and x_branch.lower() != 'all':
+                        try:
+                            return int(x_branch)
+                        except ValueError:
+                            pass
+                    return None
+        except Exception:
+            pass
+
+    x_branch = request.headers.get("X-Branch-ID")
+    if x_branch and x_branch.lower() != 'all':
+        try:
+            return int(x_branch)
+        except ValueError:
+            pass
+    return query_branch_id
 
 # Helper for multiple images
 async def save_upload_file(file: UploadFile, prefix: str) -> str:
@@ -33,9 +76,6 @@ async def save_multiple_files(files: list[UploadFile], prefix: str) -> list[str]
     return urls
 
 # Determine upload directory - use absolute path to avoid issues with working directory
-# Get the directory where main.py is located (ResortApp/)
-# frontend.py is at: ResortApp/app/api/frontend.py
-# So we need to go up 3 levels: app/api -> app -> ResortApp
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 # Ensure directory exists with proper permissions
@@ -44,10 +84,17 @@ print(f"Upload directory set to: {UPLOAD_DIR}")  # Debug log
 
 # ---------- Header & Banner ----------
 @router.get("/header-banner/", response_model=list[schemas.HeaderBanner])
-def list_header_banner(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_header_banner(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
+    eff_branch = resolve_frontend_branch(request, db, branch_id)
     query = db.query(models.HeaderBanner).options(joinedload(models.HeaderBanner.branch))
-    if branch_id is not None:
-        query = query.filter(models.HeaderBanner.branch_id == branch_id)
+    if eff_branch is not None:
+        query = query.filter(models.HeaderBanner.branch_id == eff_branch)
     items = query.offset(skip).limit(limit).all()
     for item in items:
         item.branch_name = item.branch.name if item.branch else "Main Branch"
@@ -55,8 +102,13 @@ def list_header_banner(db: Session = Depends(get_db), skip: int = 0, limit: int 
 
 
 @router.get("/header-banner", response_model=list[schemas.HeaderBanner], include_in_schema=False)
-def list_header_banner_no_slash(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
-    return list_header_banner(db=db, skip=skip, limit=limit)
+def list_header_banner_no_slash(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
+):
+    return list_header_banner(request=request, db=db, skip=skip, limit=limit)
 
 
 # ✅ Create header banner
@@ -70,9 +122,12 @@ async def create_header_banner(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        branch_id = current_user.branch_id
     try:
         # Convert is_active string to boolean
         is_active_bool = is_active.lower() in ("true", "1", "yes", "on")
+
         
         # Ensure upload directory exists
         os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -140,6 +195,11 @@ async def update_header_banner(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        existing_item = db.query(models.HeaderBanner).filter(models.HeaderBanner.id == item_id).first()
+        if existing_item and existing_item.branch_id is not None and existing_item.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        branch_id = current_user.branch_id
     try:
         # Convert is_active string to boolean
         is_active_bool = is_active.lower() in ("true", "1", "yes", "on")
@@ -198,14 +258,25 @@ async def update_header_banner(
 # ✅ Delete header banner
 @router.delete("/header-banner/{item_id}")
 def delete_header_banner(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing_item = db.query(models.HeaderBanner).filter(models.HeaderBanner.id == item_id).first()
+        if existing_item and existing_item.branch_id is not None and existing_item.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
     return crud.delete(db, models.HeaderBanner, item_id)
 
 # ---------- Check Availability ----------
 @router.get("/check-availability/", response_model=list[schemas.CheckAvailability])
-def list_check_availability(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_check_availability(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
+    eff_branch = resolve_frontend_branch(request, db, branch_id)
     query = db.query(models.CheckAvailability).options(joinedload(models.CheckAvailability.branch))
-    if branch_id is not None:
-        query = query.filter(models.CheckAvailability.branch_id == branch_id)
+    if eff_branch is not None:
+        query = query.filter(models.CheckAvailability.branch_id == eff_branch)
     items = query.offset(skip).limit(limit).all()
     for item in items:
         item.branch_name = item.branch.name if item.branch else "Main Branch"
@@ -218,32 +289,54 @@ def list_check_availability(db: Session = Depends(get_db), skip: int = 0, limit:
     include_in_schema=False,
 )
 def list_check_availability_no_slash(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_check_availability(db=db, skip=skip, limit=limit)
+    return list_check_availability(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.post("/check-availability/", response_model=schemas.CheckAvailability)
 def create_check_availability(obj: schemas.CheckAvailabilityCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        obj.branch_id = current_user.branch_id
     return crud.create(db, models.CheckAvailability, obj)
 
 
 @router.put("/check-availability/{item_id}", response_model=schemas.CheckAvailability)
 def update_check_availability(item_id: int, obj: schemas.CheckAvailabilityCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing_item = db.query(models.CheckAvailability).filter(models.CheckAvailability.id == item_id).first()
+        if existing_item and existing_item.branch_id is not None and existing_item.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        obj.branch_id = current_user.branch_id
     return crud.update(db, models.CheckAvailability, item_id, obj)
 
 
 @router.delete("/check-availability/{item_id}")
 def delete_check_availability(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing_item = db.query(models.CheckAvailability).filter(models.CheckAvailability.id == item_id).first()
+        if existing_item and existing_item.branch_id is not None and existing_item.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
     return crud.delete(db, models.CheckAvailability, item_id)
+
 
 
 # ---------- Gallery ----------
 @router.get("/gallery/", response_model=list[schemas.Gallery])
-def list_gallery(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_gallery(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
+    eff_branch = resolve_frontend_branch(request, db, branch_id)
     query = db.query(models.Gallery).options(joinedload(models.Gallery.branch))
-    if branch_id is not None:
-        query = query.filter(models.Gallery.branch_id == branch_id)
+    if eff_branch is not None:
+        query = query.filter(models.Gallery.branch_id == eff_branch)
     items = query.offset(skip).limit(limit).all()
     for item in items:
         item.branch_name = item.branch.name if item.branch else "Main Branch"
@@ -252,9 +345,12 @@ def list_gallery(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, 
 
 @router.get("/gallery", response_model=list[schemas.Gallery], include_in_schema=False)
 def list_gallery_no_slash(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_gallery(db=db, skip=skip, limit=limit)
+    return list_gallery(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.post("/gallery/", response_model=schemas.Gallery)
@@ -266,6 +362,8 @@ async def create_gallery(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        branch_id = current_user.branch_id
     try:
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         if not os.access(UPLOAD_DIR, os.W_OK):
@@ -322,6 +420,11 @@ async def update_gallery(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        existing = db.query(models.Gallery).filter(models.Gallery.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        branch_id = current_user.branch_id
     try:
         image_url = None
         if image:
@@ -381,15 +484,26 @@ async def update_gallery(
 
 @router.delete("/gallery/{item_id}")
 def delete_gallery(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing = db.query(models.Gallery).filter(models.Gallery.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
     return crud.delete(db, models.Gallery, item_id)
 
 
 # ---------- Reviews ----------
 @router.get("/reviews/", response_model=list[schemas.Review])
-def list_reviews(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_reviews(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
+    eff_branch = resolve_frontend_branch(request, db, branch_id)
     query = db.query(models.Review).options(joinedload(models.Review.branch))
-    if branch_id is not None:
-        query = query.filter(models.Review.branch_id == branch_id)
+    if eff_branch is not None:
+        query = query.filter(models.Review.branch_id == eff_branch)
     items = query.offset(skip).limit(limit).all()
     for item in items:
         item.branch_name = item.branch.name if item.branch else "Main Branch"
@@ -398,13 +512,18 @@ def list_reviews(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, 
 
 @router.get("/reviews", response_model=list[schemas.Review], include_in_schema=False)
 def list_reviews_no_slash(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_reviews(db=db, skip=skip, limit=limit)
+    return list_reviews(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.post("/reviews/", response_model=schemas.Review)
 def create_review(obj: schemas.ReviewCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        obj.branch_id = current_user.branch_id
     try:
         # Ensure rating is an integer
         if isinstance(obj.rating, str):
@@ -416,6 +535,11 @@ def create_review(obj: schemas.ReviewCreate, db: Session = Depends(get_db), curr
 
 @router.put("/reviews/{item_id}", response_model=schemas.Review)
 def update_review(item_id: int, obj: schemas.ReviewCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing = db.query(models.Review).filter(models.Review.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        obj.branch_id = current_user.branch_id
     try:
         # Ensure rating is an integer
         if isinstance(obj.rating, str):
@@ -427,15 +551,35 @@ def update_review(item_id: int, obj: schemas.ReviewCreate, db: Session = Depends
 
 @router.delete("/reviews/{item_id}")
 def delete_review(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing = db.query(models.Review).filter(models.Review.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
     return crud.delete(db, models.Review, item_id)
 
+    try:
+        # Ensure rating is an integer
+        if isinstance(obj.rating, str):
+            obj.rating = int(obj.rating)
+        return crud.update(db, models.Review, item_id, obj)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to update review: {str(e)}")
 
+
+@router.delete("/reviews/{item_id}")
 # ---------- Resort Info ----------
 @router.get("/resort-info/", response_model=list[schemas.ResortInfo])
-def list_resort_info(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_resort_info(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
+    eff_branch = resolve_frontend_branch(request, db, branch_id)
     query = db.query(models.ResortInfo).options(joinedload(models.ResortInfo.branch))
-    if branch_id is not None:
-        query = query.filter(models.ResortInfo.branch_id == branch_id)
+    if eff_branch is not None:
+        query = query.filter(models.ResortInfo.branch_id == eff_branch)
     items = query.offset(skip).limit(limit).all()
     for item in items:
         item.branch_name = item.branch.name if item.branch else "Main Branch"
@@ -446,9 +590,12 @@ def list_resort_info(db: Session = Depends(get_db), skip: int = 0, limit: int = 
     "/resort-info", response_model=list[schemas.ResortInfo], include_in_schema=False
 )
 def list_resort_info_no_slash(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_resort_info(db=db, skip=skip, limit=limit)
+    return list_resort_info(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.post("/resort-info/", response_model=schemas.ResortInfo)
@@ -457,6 +604,8 @@ def create_resort_info(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        obj.branch_id = current_user.branch_id
     return crud.create(db, models.ResortInfo, obj)
 
 
@@ -467,20 +616,36 @@ def update_resort_info(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        existing = db.query(models.ResortInfo).filter(models.ResortInfo.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        obj.branch_id = current_user.branch_id
     return crud.update(db, models.ResortInfo, item_id, obj)
 
 
 @router.delete("/resort-info/{item_id}")
 def delete_resort_info(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing = db.query(models.ResortInfo).filter(models.ResortInfo.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
     return crud.delete(db, models.ResortInfo, item_id)
 
 
 # ---------- Signature Experiences ----------
 @router.get("/signature-experiences/", response_model=list[schemas.SignatureExperience])
-def list_signature_experiences(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_signature_experiences(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
+    eff_branch = resolve_frontend_branch(request, db, branch_id)
     query = db.query(models.SignatureExperience).options(joinedload(models.SignatureExperience.branch))
-    if branch_id is not None:
-        query = query.filter(models.SignatureExperience.branch_id == branch_id)
+    if eff_branch is not None:
+        query = query.filter(models.SignatureExperience.branch_id == eff_branch)
     items = query.offset(skip).limit(limit).all()
     for item in items:
         item.branch_name = item.branch.name if item.branch else "Main Branch"
@@ -493,9 +658,12 @@ def list_signature_experiences(db: Session = Depends(get_db), skip: int = 0, lim
     include_in_schema=False,
 )
 def list_signature_experiences_no_slash(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_signature_experiences(db=db, skip=skip, limit=limit)
+    return list_signature_experiences(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.post("/signature-experiences/", response_model=schemas.SignatureExperience)
@@ -509,6 +677,8 @@ async def create_signature_experience(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        branch_id = current_user.branch_id
     try:
         image_url = await save_upload_file(image, "sigexp")
         extra_urls = await save_multiple_files(extra_images_files, "sigexp_extra")
@@ -543,6 +713,11 @@ async def update_signature_experience(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        existing = db.query(models.SignatureExperience).filter(models.SignatureExperience.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        branch_id = current_user.branch_id
     try:
         update_data = {
             "title": title,
@@ -571,15 +746,26 @@ async def update_signature_experience(
 
 @router.delete("/signature-experiences/{item_id}")
 def delete_signature_experience(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing = db.query(models.SignatureExperience).filter(models.SignatureExperience.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
     return crud.delete(db, models.SignatureExperience, item_id)
 
 
 # ---------- Plan Your Wedding ----------
 @router.get("/plan-weddings/", response_model=list[schemas.PlanWedding])
-def list_plan_weddings(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_plan_weddings(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
+    eff_branch = resolve_frontend_branch(request, db, branch_id)
     query = db.query(models.PlanWedding).options(joinedload(models.PlanWedding.branch))
-    if branch_id is not None:
-        query = query.filter(models.PlanWedding.branch_id == branch_id)
+    if eff_branch is not None:
+        query = query.filter(models.PlanWedding.branch_id == eff_branch)
     items = query.offset(skip).limit(limit).all()
     for item in items:
         item.branch_name = item.branch.name if item.branch else "Main Branch"
@@ -592,9 +778,12 @@ def list_plan_weddings(db: Session = Depends(get_db), skip: int = 0, limit: int 
     include_in_schema=False,
 )
 def list_plan_weddings_no_slash(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_plan_weddings(db=db, skip=skip, limit=limit)
+    return list_plan_weddings(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.post("/plan-weddings/", response_model=schemas.PlanWedding)
@@ -608,6 +797,8 @@ async def create_plan_wedding(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        branch_id = current_user.branch_id
     try:
         image_url = await save_upload_file(image, "wedding")
         extra_urls = await save_multiple_files(extra_images_files, "wedding_extra")
@@ -642,6 +833,11 @@ async def update_plan_wedding(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        existing = db.query(models.PlanWedding).filter(models.PlanWedding.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        branch_id = current_user.branch_id
     try:
         update_data = {
             "title": title,
@@ -670,22 +866,31 @@ async def update_plan_wedding(
 
 @router.delete("/plan-weddings/{item_id}")
 def delete_plan_wedding(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing = db.query(models.PlanWedding).filter(models.PlanWedding.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
     return crud.delete(db, models.PlanWedding, item_id)
 
 
 # ---------- Nearby Attractions ----------
 @router.get("/nearby-attractions/", response_model=list[schemas.NearbyAttraction])
-def list_nearby_attractions(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_nearby_attractions(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
     try:
-        # Verify model is available
+        eff_branch = resolve_frontend_branch(request, db, branch_id)
         if not hasattr(models, 'NearbyAttraction'):
             print("ERROR: NearbyAttraction model not found in models module")
             return []
         
-        # Try to query the table
         query = db.query(models.NearbyAttraction).options(joinedload(models.NearbyAttraction.branch))
-        if branch_id is not None:
-            query = query.filter(models.NearbyAttraction.branch_id == branch_id)
+        if eff_branch is not None:
+            query = query.filter(models.NearbyAttraction.branch_id == eff_branch)
         
         items = query.offset(skip).limit(limit).all()
         for item in items:
@@ -707,9 +912,12 @@ def list_nearby_attractions(db: Session = Depends(get_db), skip: int = 0, limit:
     include_in_schema=False,
 )
 def list_nearby_attractions_no_slash(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = None
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_nearby_attractions(db=db, skip=skip, limit=limit, branch_id=branch_id)
+    return list_nearby_attractions(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.post("/nearby-attractions/", response_model=schemas.NearbyAttraction)
@@ -724,6 +932,8 @@ async def create_nearby_attraction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        branch_id = current_user.branch_id
     try:
         image_url = await save_upload_file(image, "attraction")
         extra_urls = await save_multiple_files(extra_images_files, "attraction_extra")
@@ -760,6 +970,11 @@ async def update_nearby_attraction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        existing = db.query(models.NearbyAttraction).filter(models.NearbyAttraction.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        branch_id = current_user.branch_id
     try:
         update_data = {
             "title": title,
@@ -791,14 +1006,25 @@ async def update_nearby_attraction(
 
 @router.delete("/nearby-attractions/{item_id}")
 def delete_nearby_attraction(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.branch_id is not None:
+        existing = db.query(models.NearbyAttraction).filter(models.NearbyAttraction.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
     return crud.delete(db, models.NearbyAttraction, item_id)
 
 
 @router.get("/nearby-attraction-banners/", response_model=list[schemas.NearbyAttractionBanner])
-def list_nearby_attraction_banners(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, branch_id: int | None = Query(None, alias="active_branch")):
+def list_nearby_attraction_banners(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    branch_id: int | None = Query(None, alias="active_branch")
+):
+    eff_branch = resolve_frontend_branch(request, db, branch_id)
     query = db.query(models.NearbyAttractionBanner).options(joinedload(models.NearbyAttractionBanner.branch))
-    if branch_id is not None:
-        query = query.filter(models.NearbyAttractionBanner.branch_id == branch_id)
+    if eff_branch is not None:
+        query = query.filter(models.NearbyAttractionBanner.branch_id == eff_branch)
     items = query.offset(skip).limit(limit).all()
     for item in items:
         item.branch_name = item.branch.name if item.branch else "Main Branch"
@@ -811,9 +1037,12 @@ def list_nearby_attraction_banners(db: Session = Depends(get_db), skip: int = 0,
     include_in_schema=False,
 )
 def list_nearby_attraction_banners_no_slash(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_nearby_attraction_banners(db=db, skip=skip, limit=limit)
+    return list_nearby_attraction_banners(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.get(
@@ -822,9 +1051,12 @@ def list_nearby_attraction_banners_no_slash(
     include_in_schema=False,
 )
 def list_nearby_attraction_banner_singular(
-    db: Session = Depends(get_db), skip: int = 0, limit: int = 20
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20
 ):
-    return list_nearby_attraction_banners(db=db, skip=skip, limit=limit)
+    return list_nearby_attraction_banners(request=request, db=db, skip=skip, limit=limit)
 
 
 @router.post("/nearby-attraction-banners/", response_model=schemas.NearbyAttractionBanner)
@@ -838,6 +1070,8 @@ async def create_nearby_attraction_banner(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        branch_id = current_user.branch_id
     try:
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         if not os.access(UPLOAD_DIR, os.W_OK):
@@ -896,6 +1130,11 @@ async def update_nearby_attraction_banner(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.branch_id is not None:
+        existing = db.query(models.NearbyAttractionBanner).filter(models.NearbyAttractionBanner.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+        branch_id = current_user.branch_id
     try:
         update_data = {
             "title": title,
@@ -951,4 +1190,8 @@ async def update_nearby_attraction_banner(
 
 @router.delete("/nearby-attraction-banners/{item_id}")
 def delete_nearby_attraction_banner(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return crud.delete(db, models.NearbyAttractionBanner, item_id)
+    if current_user.branch_id is not None:
+        existing = db.query(models.NearbyAttractionBanner).filter(models.NearbyAttractionBanner.id == item_id).first()
+        if existing and existing.branch_id is not None and existing.branch_id != current_user.branch_id:
+            raise HTTPException(status_code=403, detail="Access denied to this branch content")
+    return crud.delete(db, models.NearbyAttractionBanner, item_id)

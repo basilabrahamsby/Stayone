@@ -49,37 +49,24 @@ const Dashboard = () => {
       }
       setErr(null); // Clear any previous errors
 
-      // Fetch all endpoints with individual error handling to prevent complete failure
-      // Use smaller limits and batch requests to avoid overwhelming the server
-      // Batch 1: Critical data (reduced limits for faster response)
-      const batch1 = await Promise.allSettled([
+      // Fire all endpoint queries concurrently in parallel for maximum speed
+      const results = await Promise.allSettled([
         API.get("/bookings?limit=50").catch(err => ({ error: err, data: { bookings: [] } })),
         API.get("/packages/bookingsall?limit=50").catch(err => ({ error: err, data: [] })),
         API.get("/rooms?limit=100").catch(err => ({ error: err, data: [] })),
         API.get("/expenses?limit=50").catch(err => ({ error: err, data: [] })),
-      ]);
-
-      // Batch 2: Secondary data
-      const batch2 = await Promise.allSettled([
         API.get("/food-orders?limit=50").catch(err => ({ error: err, data: [] })),
         API.get("/food-items?limit=100").catch(err => ({ error: err, data: [] })),
         API.get("/services/assigned?limit=100").catch(err => ({ error: err, data: [] })),
         API.get("/services?limit=100").catch(err => ({ error: err, data: [] })),
-      ]);
-
-      // Batch 3: Additional data
-      const batch3 = await Promise.allSettled([
         API.get("/bill/checkouts?limit=50").catch(err => ({ error: err, data: [] })),
         API.get("/packages?limit=100").catch(err => ({ error: err, data: [] })),
         API.get("/inventory/items?limit=100").catch(err => ({ error: err, data: [] })),
         API.get("/inventory/categories?limit=50").catch(err => ({ error: err, data: [] })),
         API.get("/employees?limit=100").catch(err => ({ error: err, data: [] })),
-        API.get("/dashboard/summary?period=all").catch(err => ({ error: err, data: null })),
+        API.get("/dashboard/kpis").catch(err => ({ error: err, data: null })),
         API.get("/dashboard/kpis").catch(err => ({ error: err, data: [] })),
       ]);
-
-      // Combine all results in the correct order
-      const results = [...batch1, ...batch2, ...batch3];
 
       // Process results individually - allow partial failures
       // Bookings
@@ -683,7 +670,7 @@ const Dashboard = () => {
       <div className="relative max-w-[1400px] mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         <header className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Zeebull Resort Admin Dashboard</h1>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Stayone Resort Admin Dashboard</h1>
             <p className="text-sm sm:text-base text-gray-500">Overview of bookings, rooms, revenue, expenses & operations</p>
           </div>
           <div className="text-xs sm:text-sm text-gray-500">

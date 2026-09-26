@@ -313,9 +313,9 @@ def update_journal_entry(
                         html_content=html_content
                     )
             
-            # Send to info@zeebull.com and cc orchidresort@gmail.com
+            # Send to info@stayone.com and cc orchidresort@gmail.com
             send_email(
-                to_email="info@zeebull.com",
+                to_email="info@stayone.com",
                 subject=f"Journal Entry Edited: {updated_entry.entry_number}",
                 html_content=html_content,
                 cc="orchidresort@gmail.com"

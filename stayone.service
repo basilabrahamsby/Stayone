@@ -1,5 +1,5 @@
 [Unit]
-Description=Zeebull Backend Service
+Description=StayOne Backend Service
 After=network.target postgresql.service
 
 [Service]

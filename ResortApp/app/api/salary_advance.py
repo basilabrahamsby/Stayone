@@ -65,6 +65,8 @@ def create_salary_advance(
     employee = db.query(Employee).filter(Employee.id == advance.employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
+    if branch_id is not None and employee.branch_id != branch_id:
+        raise HTTPException(status_code=403, detail="Employee does not belong to your branch")
 
     # Validate month range
     if not (1 <= advance.deduct_month <= 12):
@@ -113,6 +115,12 @@ def get_advances_for_employee(
     branch_id: int = Depends(get_branch_id)
 ):
     """Get all salary advances for a specific employee."""
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    if branch_id is not None and employee.branch_id != branch_id:
+        raise HTTPException(status_code=403, detail="Employee does not belong to your branch")
+
     query = db.query(SalaryAdvance).filter(SalaryAdvance.employee_id == employee_id)
     if branch_id is not None:
         query = query.filter(SalaryAdvance.branch_id == branch_id)
@@ -129,6 +137,12 @@ def get_advances_for_month(
     branch_id: int = Depends(get_branch_id)
 ):
     """Get salary advances that are scheduled for deduction in a specific month."""
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    if branch_id is not None and employee.branch_id != branch_id:
+        raise HTTPException(status_code=403, detail="Employee does not belong to your branch")
+
     query = db.query(SalaryAdvance).filter(
         SalaryAdvance.employee_id == employee_id,
         SalaryAdvance.deduct_year == year,
@@ -144,12 +158,16 @@ def update_advance_status(
     advance_id: int,
     update: SalaryAdvanceUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    branch_id: int = Depends(get_branch_id)
 ):
     """Mark an advance as deducted or update notes."""
-    advance = db.query(SalaryAdvance).filter(SalaryAdvance.id == advance_id).first()
+    query = db.query(SalaryAdvance).filter(SalaryAdvance.id == advance_id)
+    if branch_id is not None:
+        query = query.filter(SalaryAdvance.branch_id == branch_id)
+    advance = query.first()
     if not advance:
-        raise HTTPException(status_code=404, detail="Salary advance not found")
+        raise HTTPException(status_code=404, detail="Salary advance not found or access denied")
 
     was_pending = advance.status == "pending"
 
@@ -186,12 +204,17 @@ def update_advance_status(
 def delete_advance(
     advance_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    branch_id: int = Depends(get_branch_id)
 ):
     """Delete a salary advance record."""
-    advance = db.query(SalaryAdvance).filter(SalaryAdvance.id == advance_id).first()
+    query = db.query(SalaryAdvance).filter(SalaryAdvance.id == advance_id)
+    if branch_id is not None:
+        query = query.filter(SalaryAdvance.branch_id == branch_id)
+    advance = query.first()
     if not advance:
-        raise HTTPException(status_code=404, detail="Salary advance not found")
+        raise HTTPException(status_code=404, detail="Salary advance not found or access denied")
     db.delete(advance)
     db.commit()
     return {"message": "Advance deleted successfully"}
+

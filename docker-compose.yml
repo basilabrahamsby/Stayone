@@ -1,0 +1,111 @@
+name: stayone
+
+services:
+  # ============================================================================
+  # 1. PostgreSQL Database Service
+  # ============================================================================
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qwerty123}
+      POSTGRES_DB: ${POSTGRES_DB:-stayone_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-stayone_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # 2. FastAPI Backend Service (ResortApp)
+  # ============================================================================
+  backend:
+    build:
+      context: ./ResortApp
+      dockerfile: Dockerfile
+    image: stayone-backend:latest
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-qwerty123}@db:5432/${POSTGRES_DB:-stayone_db}
+      PORT: 8011
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "${BACKEND_PORT:-8011}:8011"
+    volumes:
+      - ./ResortApp:/app
+      - /app/venv
+      - ./ResortApp/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ============================================================================
+  # 3. Admin Dashboard (dasboard)
+  # ============================================================================
+  admin:
+    build:
+      context: ./dasboard
+      dockerfile: Dockerfile
+    image: stayone-admin:latest
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      FAST_REFRESH: "true"
+    volumes:
+      - ./dasboard/src:/app/src
+      - ./dasboard/public:/app/public
+    depends_on:
+      - backend
+
+  # ============================================================================
+  # 4. User-End Frontend (userend)
+  # ============================================================================
+  userend:
+    build:
+      context: ./userend
+      dockerfile: Dockerfile
+    image: stayone-userend:latest
+    restart: unless-stopped
+    ports:
+      - "${USEREND_PORT:-3002}:3002"
+    environment:
+      PORT: 3002
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      FAST_REFRESH: "true"
+    volumes:
+      - ./userend/src:/app/src
+      - ./userend/public:/app/public
+    depends_on:
+      - backend
+
+  # ============================================================================
+  # 5. Optional Unified Gateway (Nginx Reverse Proxy)
+  # ============================================================================
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    volumes:
+      - ./nginx/local.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - admin
+      - userend
+
+volumes:
+  postgres_data:
+    name: stayone_postgres_data
+    driver: local

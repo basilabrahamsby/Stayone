@@ -51,6 +51,7 @@ from app.api import (
     activity_logs,
     calendar,
     legal,
+    saas_register,
 )
 from app.api.settings import router as settings_router
 from app.api import reports_module
@@ -283,6 +284,7 @@ if userend_build_path.exists():
         )
 
 # API Routes
+app.include_router(saas_register.router, prefix="/api", tags=["SaaS Registration & Subscriptions"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(user.router, prefix="/api", tags=["Users"])

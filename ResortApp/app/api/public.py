@@ -70,7 +70,7 @@ def get_app_version(db: Session = Depends(get_db)):
     force_update_setting = db.query(SystemSetting).filter(SystemSetting.key == "mobile_app_force_update", SystemSetting.branch_id == None).first()
 
     min_version = min_version_setting.value if min_version_setting else "1.2.1"
-    play_store_url = play_store_url_setting.value if play_store_url_setting else "https://play.google.com/store/apps/details?id=com.teqmates.zeebull_employee"
+    play_store_url = play_store_url_setting.value if play_store_url_setting else "https://play.google.com/store/apps/details?id=com.teqmates.stayone_employee"
     force_update = (force_update_setting.value.lower() == "true") if force_update_setting else True
 
     return AppVersionCheck(
@@ -81,12 +81,30 @@ def get_app_version(db: Session = Depends(get_db)):
     )
 
 
+def _is_branch_active(db: Session, branch_id: int) -> bool:
+    """Check if branch and its parent tenant workspace are active"""
+    from app.models.branch import Branch
+    from app.models.tenant import Tenant
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch or not branch.is_active:
+        return False
+    if branch.tenant_id:
+        tenant = db.query(Tenant).filter(Tenant.id == branch.tenant_id).first()
+        if tenant and not tenant.is_active:
+            return False
+    return True
+
 # Public Branches endpoint
 @router.get("/branches")
 def get_public_branches(db: Session = Depends(get_db)):
-    """Get all active branches without authentication"""
+    """Get all active branches without authentication (excluding disabled properties)"""
     try:
-        branches = db.query(Branch).filter(Branch.is_active == True).all()
+        from app.models.tenant import Tenant
+        from sqlalchemy import or_
+        branches = db.query(Branch).outerjoin(Tenant, Branch.tenant_id == Tenant.id).filter(
+            Branch.is_active == True,
+            or_(Branch.tenant_id == None, Tenant.is_active == True)
+        ).all()
         return branches
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching branches: {str(e)}")
@@ -94,11 +112,21 @@ def get_public_branches(db: Session = Depends(get_db)):
 # Public Rooms endpoint
 @router.get("/rooms", response_model=List[RoomOut])
 def get_public_rooms(db: Session = Depends(get_db), branch_id: int = None, skip: int = 0, limit: int = 100):
-    """Get all rooms for a specific branch"""
+    """Get all rooms for a specific branch (only if active)"""
     try:
+        if branch_id and not _is_branch_active(db, branch_id):
+            return []
         query = db.query(Room)
         if branch_id:
             query = query.filter(Room.branch_id == branch_id)
+        else:
+            # Only include rooms from active branches
+            from app.models.tenant import Tenant
+            from sqlalchemy import or_
+            query = query.join(Branch, Room.branch_id == Branch.id).outerjoin(Tenant, Branch.tenant_id == Tenant.id).filter(
+                Branch.is_active == True,
+                or_(Branch.tenant_id == None, Tenant.is_active == True)
+            )
         rooms = query.offset(skip).limit(limit).all()
         return rooms
     except Exception as e:
@@ -107,11 +135,20 @@ def get_public_rooms(db: Session = Depends(get_db), branch_id: int = None, skip:
 # Public Packages endpoint
 @router.get("/packages", response_model=List[PackageOut])
 def get_public_packages(db: Session = Depends(get_db), branch_id: int = None, skip: int = 0, limit: int = 100):
-    """Get all packages for a specific branch"""
+    """Get all packages for a specific branch (only if active)"""
     try:
+        if branch_id and not _is_branch_active(db, branch_id):
+            return []
         query = db.query(Package)
         if branch_id:
             query = query.filter(Package.branch_id == branch_id)
+        else:
+            from app.models.tenant import Tenant
+            from sqlalchemy import or_
+            query = query.join(Branch, Package.branch_id == Branch.id).outerjoin(Tenant, Branch.tenant_id == Tenant.id).filter(
+                Branch.is_active == True,
+                or_(Branch.tenant_id == None, Tenant.is_active == True)
+            )
         packages = query.options(
             joinedload(Package.images),
             joinedload(Package.branch)
@@ -123,11 +160,20 @@ def get_public_packages(db: Session = Depends(get_db), branch_id: int = None, sk
 # Public Food Items endpoint
 @router.get("/food-items")
 def get_public_food_items(db: Session = Depends(get_db), branch_id: int = None):
-    """Get all food items for a specific branch"""
+    """Get all food items for a specific branch (only if active)"""
     try:
+        if branch_id and not _is_branch_active(db, branch_id):
+            return []
         query = db.query(FoodItem)
         if branch_id:
             query = query.filter(FoodItem.branch_id == branch_id)
+        else:
+            from app.models.tenant import Tenant
+            from sqlalchemy import or_
+            query = query.join(Branch, FoodItem.branch_id == Branch.id).outerjoin(Tenant, Branch.tenant_id == Tenant.id).filter(
+                Branch.is_active == True,
+                or_(Branch.tenant_id == None, Tenant.is_active == True)
+            )
         food_items = query.options(
             joinedload(FoodItem.images),
             joinedload(FoodItem.category)
@@ -149,11 +195,20 @@ def get_public_food_categories(db: Session = Depends(get_db)):
 # Public Services endpoint
 @router.get("/services")
 def get_public_services(db: Session = Depends(get_db), branch_id: int = None):
-    """Get all services for a specific branch"""
+    """Get all services for a specific branch (only if active)"""
     try:
+        if branch_id and not _is_branch_active(db, branch_id):
+            return []
         query = db.query(Service).filter(Service.is_visible_to_guest == True)
         if branch_id:
             query = query.filter(Service.branch_id == branch_id)
+        else:
+            from app.models.tenant import Tenant
+            from sqlalchemy import or_
+            query = query.join(Branch, Service.branch_id == Branch.id).outerjoin(Tenant, Branch.tenant_id == Tenant.id).filter(
+                Branch.is_active == True,
+                or_(Branch.tenant_id == None, Tenant.is_active == True)
+            )
         services = query.options(joinedload(Service.images)).all()
         return services
     except Exception as e:

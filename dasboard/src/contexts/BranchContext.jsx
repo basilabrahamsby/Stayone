@@ -32,13 +32,22 @@ export const BranchProvider = ({ children }) => {
         try {
             setLoading(true);
             const response = await api.get('/branches');
-            setBranches(response.data);
+            const branchList = response.data || [];
+            setBranches(branchList);
 
-            // If activeBranchId is 'all', we keep it. Otherwise, check if valid.
-            if (activeBranchId !== 'all' && response.data.length > 0) {
-                const isValid = response.data.some(b => b.id.toString() === activeBranchId.toString());
+            // If user only has access to a single branch (Branch Admin), lock activeBranchId to that branch
+            if (branchList.length === 1) {
+                const singleBranchId = branchList[0].id.toString();
+                if (activeBranchId.toString() !== singleBranchId) {
+                    setActiveBranchId(singleBranchId);
+                    localStorage.setItem('activeBranchId', singleBranchId);
+                }
+            } else if (activeBranchId !== 'all' && branchList.length > 0) {
+                const isValid = branchList.some(b => b.id.toString() === activeBranchId.toString());
                 if (!isValid) {
-                    switchBranch('all');
+                    const fallbackId = branchList[0].id.toString();
+                    setActiveBranchId(fallbackId);
+                    localStorage.setItem('activeBranchId', fallbackId);
                 }
             }
         } catch (error) {
@@ -49,13 +58,17 @@ export const BranchProvider = ({ children }) => {
     };
 
     const switchBranch = (branchId) => {
+        // If user is a branch admin with only 1 branch, do not allow switching
+        if (branches.length <= 1) {
+            return;
+        }
         setActiveBranchId(branchId);
         localStorage.setItem('activeBranchId', branchId);
         // Force a page reload or trigger a global data refresh
         window.location.reload();
     };
 
-    const activeBranch = branches.find(b => b.id.toString() === activeBranchId.toString());
+    const activeBranch = branches.find(b => b.id.toString() === activeBranchId.toString()) || (branches.length === 1 ? branches[0] : null);
 
     return (
         <BranchContext.Provider value={{

@@ -1,6 +1,6 @@
-# Zeebull - Complete Hospitality Solution
+# StayOne - Complete Hospitality Solution
 
-Zeebull is a multi-platform hospitality management system designed for resorts, hotels, and multi-branch hospitality businesses. It provides a seamless experience for guests, employees, and management through integrated web and mobile applications.
+StayOne is a multi-platform hospitality management system designed for resorts, hotels, and multi-branch hospitality businesses. It provides a seamless experience for guests, employees, and management through integrated web and mobile applications.
 
 ## 🚀 Features
 
@@ -31,12 +31,38 @@ Zeebull is a multi-platform hospitality management system designed for resorts, 
 
 ## ⚙️ Development Setup
 
-### Backend
+### Option 1: Docker Compose (Recommended)
+Make sure Docker Desktop is installed and running, then:
+
+```bash
+# Start all local containers (Postgres, Backend, Admin, User End, Gateway)
+docker_start_local.bat
+
+# Or using Docker CLI directly:
+docker compose --env-file .env.docker up --build -d
+```
+
+**Local Endpoints:**
+- **Admin Dashboard**: `http://localhost:3000`
+- **User End**: `http://localhost:3002`
+- **Backend API Docs**: `http://localhost:8011/docs`
+- **Unified Gateway**: `http://localhost:8080`
+- **PostgreSQL**: `localhost:5432` (`stayone_db` / user: `postgres`, password: `qwerty123`)
+
+To stop:
+```bash
+docker_stop_local.bat
+# Or: docker compose down
+```
+
+### Option 2: Native Setup (Without Docker)
+
+#### Backend
 1. Navigate to `ResortApp/`.
 2. Install dependencies: `pip install -r requirements.txt`.
 3. Run local server: `python main.py` (Default port: 8011).
 
-### Mobile
+#### Mobile
 1. Navigate to `Mobile/employee/` or `Mobile/owner/`.
 2. Run `flutter pub get`.
 3. Run `flutter run`.

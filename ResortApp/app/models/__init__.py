@@ -1,3 +1,4 @@
+from .tenant import SaaSPlan, Tenant
 from .user import User, Role
 from .branch import Branch
 from .room import Room

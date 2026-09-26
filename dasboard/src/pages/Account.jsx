@@ -989,7 +989,7 @@ export default function ReportsDashboard() {
     };
 
     // Header logic
-    const resortName = "ORCHID TRAILS RESORT WAYANAD BY ZEEBULL";
+    const resortName = "ORCHID TRAILS RESORT WAYANAD BY STAYONE";
     const headerLines = [
       resortName,
       "Mookkuthikunnu, Noolpuzha, Sultan Bathery, Kerala 673595",

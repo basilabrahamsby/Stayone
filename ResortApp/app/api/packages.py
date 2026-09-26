@@ -458,7 +458,7 @@ def book_package_api(
             
             # Notify admin
             send_email(
-                to_email="info@zeebull.com",
+                to_email="info@stayone.com",
                 subject=f"New Package Booking: {formatted_booking_id}",
                 html_content=email_html,
                 cc="orchidresort@gmail.com"
@@ -550,7 +550,7 @@ def book_package_guest_api(
                     
                     # Notify admin
                     send_email(
-                        to_email="info@zeebull.com",
+                        to_email="info@stayone.com",
                         subject=f"New Package Booking: {formatted_booking_id}",
                         html_content=email_html,
                         cc="orchidresort@gmail.com"

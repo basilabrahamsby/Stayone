@@ -113,7 +113,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'Zeebull',
+                    'StayOne',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,

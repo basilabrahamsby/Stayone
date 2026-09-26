@@ -72,7 +72,7 @@ def update_version(min_version=None, play_store_url=None, force_update=None):
         db.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Update Zeebull Mobile App version configuration in the database.")
+    parser = argparse.ArgumentParser(description="Update StayOne Mobile App version configuration in the database.")
     parser.add_argument("--min-version", help="Minimum required mobile app version (e.g. 1.2.2)")
     parser.add_argument("--play-store-url", help="Google Play Store download URL")
     parser.add_argument("--force-update", choices=["true", "false"], help="Enable/disable force update (true/false)")

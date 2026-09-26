@@ -1243,14 +1243,14 @@ def create_booking(
         if booking_full.guest_email:
             send_email(
                 to_email=booking_full.guest_email,
-                subject=f"Booking Confirmation {formatted_booking_id} - Zeebull Hospitality",
+                subject=f"Booking Confirmation {formatted_booking_id} - Stayone Hospitality",
                 html_content=email_html,
                 to_name=booking_full.guest_name
             )
 
         # Notify admin
         send_email(
-            to_email="info@zeebull.com",
+            to_email="info@stayone.com",
             subject=f"New Room Booking: {formatted_booking_id}",
             html_content=email_html,
             cc="orchidresort@gmail.com"

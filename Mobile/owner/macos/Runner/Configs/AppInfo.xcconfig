@@ -8,7 +8,7 @@
 PRODUCT_NAME = orchid_mobile
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.zeebull.owner
+PRODUCT_BUNDLE_IDENTIFIER = com.stayone.owner
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.teqmates.orchid. All rights reserved.

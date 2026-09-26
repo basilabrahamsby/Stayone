@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.database import get_db
 from app.models.calendar import PricingCalendar
 from app.models.room import RoomType
 from app.schemas.calendar import PricingCalendarCreate, PricingCalendarUpdate, PricingCalendarOut
-from typing import List
+from app.utils.branch_scope import get_branch_id
+from typing import List, Optional
 from datetime import date
 
 router = APIRouter(tags=["Pricing Calendar"])
@@ -46,11 +48,17 @@ def _trigger_all_room_rates():
 def create_calendar_entry(
     entry: PricingCalendarCreate,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
     if entry.start_date > entry.end_date:
         raise HTTPException(status_code=400, detail="start_date cannot be after end_date.")
-    new_entry = PricingCalendar(**entry.model_dump())
+    
+    entry_data = entry.model_dump()
+    if branch_id is not None:
+        entry_data["branch_id"] = branch_id
+
+    new_entry = PricingCalendar(**entry_data)
     db.add(new_entry)
     db.commit()
     db.refresh(new_entry)
@@ -63,13 +71,26 @@ def create_calendar_entry(
 
 @router.get("", response_model=List[PricingCalendarOut])
 @router.get("/", response_model=List[PricingCalendarOut])
-def get_calendar_entries(db: Session = Depends(get_db)):
-    return db.query(PricingCalendar).all()
+def get_calendar_entries(
+    db: Session = Depends(get_db),
+    branch_id: Optional[int] = Depends(get_branch_id)
+):
+    query = db.query(PricingCalendar)
+    if branch_id is not None:
+        query = query.filter(or_(PricingCalendar.branch_id == branch_id, PricingCalendar.branch_id == None))
+    return query.all()
 
 
 @router.get("/{entry_id}", response_model=PricingCalendarOut)
-def get_calendar_entry(entry_id: int, db: Session = Depends(get_db)):
-    db_entry = db.query(PricingCalendar).filter(PricingCalendar.id == entry_id).first()
+def get_calendar_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    branch_id: Optional[int] = Depends(get_branch_id)
+):
+    query = db.query(PricingCalendar).filter(PricingCalendar.id == entry_id)
+    if branch_id is not None:
+        query = query.filter(or_(PricingCalendar.branch_id == branch_id, PricingCalendar.branch_id == None))
+    db_entry = query.first()
     if not db_entry:
         raise HTTPException(status_code=404, detail="Entry not found.")
     return db_entry
@@ -80,13 +101,19 @@ def update_calendar_entry(
     entry_id: int,
     entry: PricingCalendarUpdate,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
-    db_entry = db.query(PricingCalendar).filter(PricingCalendar.id == entry_id).first()
+    query = db.query(PricingCalendar).filter(PricingCalendar.id == entry_id)
+    if branch_id is not None:
+        query = query.filter(or_(PricingCalendar.branch_id == branch_id, PricingCalendar.branch_id == None))
+    db_entry = query.first()
     if not db_entry:
         raise HTTPException(status_code=404, detail="Entry not found.")
 
     update_data = entry.model_dump(exclude_unset=True)
+    if branch_id is not None:
+        update_data["branch_id"] = branch_id
     for key, value in update_data.items():
         setattr(db_entry, key, value)
 
@@ -103,11 +130,15 @@ def update_calendar_entry(
 def delete_calendar_entry(
     entry_id: int,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
-    db_entry = db.query(PricingCalendar).filter(PricingCalendar.id == entry_id).first()
+    query = db.query(PricingCalendar).filter(PricingCalendar.id == entry_id)
+    if branch_id is not None:
+        query = query.filter(PricingCalendar.branch_id == branch_id)
+    db_entry = query.first()
     if not db_entry:
-        raise HTTPException(status_code=404, detail="Entry not found.")
+        raise HTTPException(status_code=404, detail="Entry not found or access denied.")
 
     db.delete(db_entry)
     db.commit()
@@ -116,3 +147,4 @@ def delete_calendar_entry(
     background_tasks.add_task(_trigger_all_room_rates)
 
     return {"message": "Entry deleted successfully"}
+

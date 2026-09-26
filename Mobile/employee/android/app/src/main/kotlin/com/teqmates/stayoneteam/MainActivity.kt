@@ -1,4 +1,4 @@
-package com.teqmates.zeebullteam
+package com.teqmates.stayoneteam
 
 import io.flutter.embedding.android.FlutterActivity
 

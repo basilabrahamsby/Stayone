@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 
 class ApiConstants {
   // Production URLs
-  static const String baseUrl = 'https://zeebull.com/api';
-  static const String imageBaseUrl = 'https://zeebull.com';
+  static const String baseUrl = 'https://stayone.com/api';
+  static const String imageBaseUrl = 'https://stayone.com';
   static const String login = '/auth/login';
   static const String profile = '/auth/me';
   

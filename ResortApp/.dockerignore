@@ -1,0 +1,24 @@
+# Python virtualenv & cache
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Large archives and backups
+*.zip
+*.tar.gz
+*.backup
+*.bak
+*.dump
+*.sql
+
+# Logs and test artifacts
+*.log
+.coverage
+.pytest_cache/
+scratch/
+tmp/
+uploads/
+uploads_*/

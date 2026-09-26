@@ -9,6 +9,7 @@ import { ProtectedRoute } from "./layout/DashboardLayout";
 import Dashboard from "./pages/Dashboard.jsx";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard.jsx";
 import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
 
 import Bookings from "./pages/Bookings.jsx";
 import CreateRooms from "./pages/CreateRooms.jsx";
@@ -39,12 +40,11 @@ const getRouterBasename = () => {
     return "/admin";
   }
   const path = window.location.pathname || "";
-  // Check path first to determine basename, even on localhost
-  if (path.startsWith("/zeebull/admin")) {
-    return "/zeebull/admin";
+  if (path.startsWith("/stayone/admin")) {
+    return "/stayone/admin";
   }
-  if (path.startsWith("/zeebulladmin")) {
-    return "/zeebulladmin";
+  if (path.startsWith("/stayoneadmin")) {
+    return "/stayoneadmin";
   }
   if (path.startsWith("/inventory/admin")) {
     return "/inventory/admin";
@@ -61,9 +61,9 @@ const getRouterBasename = () => {
   // For local development without path prefix, use empty basename
   const hostname = window.location.hostname || "";
   if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-    return "/orchidadmin";
+    return "";
   }
-  return "/zeebull/admin";
+  return "/stayoneadmin";
 };
 
 function App() {
@@ -74,13 +74,14 @@ function App() {
         <NotificationProvider>
           <Routes>
             <Route path="/" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={
               <ProtectedRoute requiredPermission="/dashboard">
                 <Dashboard />
               </ProtectedRoute>
             } />
             <Route path="/superadmin-dashboard" element={
-              <ProtectedRoute>
+              <ProtectedRoute superAdminOnly={true}>
                 <SuperAdminDashboard />
               </ProtectedRoute>
             } />
@@ -250,7 +251,7 @@ function App() {
             <Route
               path="/branch-management"
               element={
-                <ProtectedRoute requiredPermission="/branch-management">
+                <ProtectedRoute superAdminOnly={true} requiredPermission="/branch-management">
                   <BranchManagement />
                 </ProtectedRoute>
               }

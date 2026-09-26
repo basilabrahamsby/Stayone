@@ -1,4 +1,4 @@
-package com.zeebull.owner
+package com.stayone.owner
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

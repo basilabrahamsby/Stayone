@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
-import localLogo from "./assets/zeebulllogo.png";
+import localLogo from "./assets/stayonelogo.png";
 // Lucide React is used for elegant icons
-import { BedDouble, Coffee, ConciergeBell, MapPin, Package, Clock, Users, User, Calendar, Check, ChevronRight, ChevronLeft, ChevronDown, Image as ImageIcon, Star, Quote, ChevronUp, MessageSquare, Send, X, Facebook, Instagram, Linkedin, Twitter, Moon, Sun, Droplet, Menu, Phone, Mail } from 'lucide-react';
+import { BedDouble, Coffee, ConciergeBell, MapPin, Package, Clock, Users, User, Calendar, Check, ChevronRight, ChevronLeft, ChevronDown, Image as ImageIcon, Star, Quote, ChevronUp, MessageSquare, Send, X, Facebook, Instagram, Linkedin, Twitter, Moon, Sun, Droplet, Menu, Phone, Mail, Building, Sparkles, Shield, ArrowRight, ExternalLink } from 'lucide-react';
 import { SiGooglemaps, SiGhost } from "react-icons/si";
 // Currency formatting utility
 import { formatCurrency } from './utils/currency';
@@ -529,7 +529,7 @@ const BackgroundAnimation = ({ theme }) => {
         <>
             <style>{`
                 /* 
-                   Zeebull Hospitality  Ultra-Premium Design System v4
+                   Stayone Hospitality  Ultra-Premium Design System v4
                    Theme: Midnight Obsidian  Liquid Gold  Platinum
                    Inspired by: Aman Resorts  The Brando  Six Senses
                  */
@@ -1131,7 +1131,7 @@ const PropertyPortal = ({ branches, onSelect, theme }) => {
 
             <div className="z-10 max-w-6xl w-full">
                 <div className="text-center mb-16 animate-fade-in-up">
-                    <div className="section-badge mb-4">The Zeebull Collection</div>
+                    <div className="section-badge mb-4">The Stayone Collection</div>
                     <h1 className="section-title mb-4">Select Your Sanctuary</h1>
                     <p className="section-subtitle max-w-2xl mx-auto">
                         Explore our world-class resorts, each meticulously designed to offer a unique blend of luxury, serenity, and unparalleled service.
@@ -1185,7 +1185,7 @@ const PropertyPortal = ({ branches, onSelect, theme }) => {
 
                 <div className="mt-20 text-center animate-fade-in opacity-60">
                     <p className="text-[10px] uppercase tracking-[0.3em] font-medium text-neutral-500">
-                        Luxury Management by TeqMates Zeebull
+                        Luxury Management by TeqMates Stayone
                     </p>
                 </div>
             </div>
@@ -1225,6 +1225,46 @@ export default function App() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    const getAdminRegisterUrl = useCallback(() => {
+        if (typeof window !== "undefined") {
+            const { hostname, port, protocol } = window.location;
+            if (port === "3002") {
+                return `${protocol}//${hostname}:3000/stayoneadmin/register`;
+            }
+            if (port === "8080") {
+                return `${protocol}//${hostname}:8080/stayoneadmin/register`;
+            }
+            return "/stayoneadmin/register";
+        }
+        return "/stayoneadmin/register";
+    }, []);
+
+    const getAdminLoginUrl = useCallback(() => {
+        if (typeof window !== "undefined") {
+            const { hostname, port, protocol } = window.location;
+            if (port === "3002") {
+                return `${protocol}//${hostname}:3000/stayoneadmin`;
+            }
+            if (port === "8080") {
+                return `${protocol}//${hostname}:8080/stayoneadmin`;
+            }
+            return "/stayoneadmin";
+        }
+        return "/stayoneadmin";
+    }, []);
+
+    // Auto-redirect if visitor hits /register or /dashboard/register directly on userend port
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const pathname = window.location.pathname.toLowerCase();
+            if (pathname.includes("register")) {
+                window.location.replace(getAdminRegisterUrl());
+            } else if (pathname === "/login" || pathname === "/dashboard/login" || pathname.startsWith("/admin")) {
+                window.location.replace(getAdminLoginUrl());
+            }
+        }
+    }, [getAdminRegisterUrl, getAdminLoginUrl]);
+
     const itemsPerSlide = windowWidth < 768 ? 1 : (windowWidth < 1024 ? 2 : 3);
     const logoCandidates = useMemo(() => {
         const unique = new Set();
@@ -1245,15 +1285,15 @@ export default function App() {
 
         addCandidate("/logo.jpeg");
         addCandidate("/logo.png");
-        addCandidate("/zeebull/logo.jpeg");
-        addCandidate("/zeebull/logo.png");
+        addCandidate("/stayone/logo.jpeg");
+        addCandidate("/stayone/logo.png");
 
         if (typeof window !== "undefined") {
             const origin = window.location.origin;
             addCandidate(`${origin}/logo.jpeg`);
             addCandidate(`${origin}/logo.png`);
-            addCandidate(`${origin}/zeebull/logo.jpeg`);
-            addCandidate(`${origin}/zeebull/logo.png`);
+            addCandidate(`${origin}/stayone/logo.jpeg`);
+            addCandidate(`${origin}/stayone/logo.png`);
             const { pathname } = window.location;
             if (pathname && pathname !== "/") {
                 const trimmedPath = pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -1293,7 +1333,7 @@ export default function App() {
     const [showBackToTop, setShowBackToTop] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatHistory, setChatHistory] = useState([
-        { role: "model", parts: [{ text: "Hello! I am your personal AI Concierge. How can I assist you with your stay at the Zeebull Hospitality today?" }] }
+        { role: "model", parts: [{ text: "Hello! I am your personal AI Concierge. How can I assist you with your stay at the Stayone Hospitality today?" }] }
     ]);
     const [userMessage, setUserMessage] = useState("");
     const [isChatLoading, setIsChatLoading] = useState(false);
@@ -1406,6 +1446,7 @@ export default function App() {
     const [isFoodOrderFormOpen, setIsFoodOrderFormOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isGeneralBookingOpen, setIsGeneralBookingOpen] = useState(false);
+    const [isUserPartnerModalOpen, setIsUserPartnerModalOpen] = useState(false);
     const [showAmenities, setShowAmenities] = useState(false);
     const [isNavScrolled, setIsNavScrolled] = useState(false);
 
@@ -2827,7 +2868,7 @@ export default function App() {
                         <div className="absolute inset-0 rounded-full flex items-center justify-center">
                             <img
                                 src={logoSrc || localLogo}
-                                alt="Zeebull"
+                                alt="Stayone"
                                 className="h-24 md:h-32 w-auto object-contain drop-shadow-[0_0_20px_rgba(251,191,36,0.3)] animate-[logo-pulse_2s_ease-in-out_infinite]"
                             />
                         </div>
@@ -2836,7 +2877,7 @@ export default function App() {
                     <div className="text-center space-y-3">
                         <div className="overflow-hidden">
                             <p className="text-[10px] md:text-xs tracking-[0.4em] uppercase text-amber-500/80 font-bold animate-fade-in-up">
-                                The Zeebull Collection
+                                The Stayone Collection
                             </p>
                         </div>
                         <div className="flex items-center justify-center gap-1.5 h-4">
@@ -2929,22 +2970,40 @@ export default function App() {
                     }}></div>
 
                     <div className="container mx-auto px-4 sm:px-6 md:px-12 h-full flex items-center justify-between relative z-10">
-                        {/* Logo */}
+                        {/* Logo - Enhanced with high-end luxury presentation */}
                         <div className="flex items-center h-full">
-                            <div className="flex items-center justify-center transition-all duration-500">
-                                <img
-                                    src={logoSrc}
-                                    alt="Resort logo"
-                                    className="object-contain drop-shadow-md"
-                                    style={{ height: isNavScrolled ? '75px' : '105px', width: 'auto' }}
-                                    loading="lazy"
-                                    onError={() => {
-                                        setLogoIndex((prev) => {
-                                            const next = prev + 1;
-                                            return next < logoCandidates.length ? next : prev;
-                                        });
-                                    }}
-                                />
+                            <div 
+                                onClick={() => { setSelectedBranch(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group transition-all duration-300"
+                            >
+                                <div className="relative flex items-center justify-center">
+                                    <div className="absolute -inset-1 rounded-2xl bg-amber-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                    <img
+                                        src={logoSrc}
+                                        alt="StayOne Hospitality"
+                                        className="relative object-contain transition-all duration-300 drop-shadow-md group-hover:scale-105"
+                                        style={{ height: isNavScrolled ? '48px' : '58px', width: 'auto', maxHeight: '64px' }}
+                                        loading="eager"
+                                        fetchpriority="high"
+                                        onError={() => {
+                                            setLogoIndex((prev) => {
+                                                const next = prev + 1;
+                                                return next < logoCandidates.length ? next : prev;
+                                            });
+                                        }}
+                                    />
+                                </div>
+                                <div className="hidden sm:flex flex-col text-left select-none">
+                                    <span 
+                                        className="text-xs md:text-sm font-extrabold tracking-[0.2em] uppercase font-display" 
+                                        style={{ color: isNavScrolled ? '#111118' : '#ffffff', textShadow: isNavScrolled ? 'none' : '0 2px 10px rgba(0,0,0,0.8)' }}
+                                    >
+                                        STAYONE
+                                    </span>
+                                    <span className="text-[8px] md:text-[9px] tracking-[0.28em] uppercase font-bold text-amber-500">
+                                        HOTELS & RESORTS
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
@@ -2958,6 +3017,7 @@ export default function App() {
                                 { label: 'Food', target: '[data-food-section]', type: 'selector' },
                                 { label: 'Gallery', target: '[data-gallery-section]', type: 'selector' },
                                 { label: 'Reviews', target: '[data-reviews-section]', type: 'selector' },
+                                { label: 'Partner', target: 'partner', type: 'id' },
                                 { label: 'Contact', target: '[data-contact-section]', type: 'selector' },
                             ].map(({ label, target, type, action }) => (
                                 <a
@@ -2977,6 +3037,9 @@ export default function App() {
                                             if (target === '[data-contact-section]') {
                                                 const el = document.querySelector(target);
                                                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            } else if (target === 'partner') {
+                                                const el = document.getElementById('partner') || document.querySelector('[data-partner-section]');
+                                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                             } else if (!selectedBranch) {
                                                 const el = document.getElementById('properties');
                                                 if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -2993,14 +3056,47 @@ export default function App() {
                             ))}
                         </nav>
 
-                        {/* Book Now Button & Mobile Menu Toggle */}
-                        <div className="flex items-center" style={{ gap: '0.75rem' }}>
+                        {/* User / Partner Options & Book Now & Mobile Menu Toggle */}
+                        <div className="flex items-center" style={{ gap: '0.6rem' }}>
+                            {/* User / Partner Options Trigger */}
+                            <button
+                                onClick={() => setIsUserPartnerModalOpen(true)}
+                                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-300 border shadow-sm group"
+                                style={{
+                                    color: isNavScrolled ? '#8c5d14' : '#f5d485',
+                                    borderColor: isNavScrolled ? 'rgba(200,151,30,0.5)' : 'rgba(245,212,133,0.5)',
+                                    background: isNavScrolled ? 'rgba(245,212,133,0.18)' : 'rgba(0,0,0,0.4)',
+                                    backdropFilter: 'blur(10px)',
+                                }}
+                            >
+                                <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:scale-125 transition-transform" />
+                                <span>User or Partner</span>
+                            </button>
+
                             <button
                                 onClick={() => { setShowAmenities(false); setIsGeneralBookingOpen(true); }}
                                 className="btn-gold hidden sm:inline-flex"
                             >
                                 Reserve Now
                             </button>
+
+                            {/* List Your Property button - desktop */}
+                            <a
+                                href={getAdminRegisterUrl()}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest transition-all duration-300 border"
+                                style={{
+                                    color: isNavScrolled ? 'var(--gold)' : 'rgba(200,151,30,0.92)',
+                                    borderColor: isNavScrolled ? 'rgba(200,151,30,0.4)' : 'rgba(200,151,30,0.4)',
+                                    background: 'rgba(200,151,30,0.08)',
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(200,151,30,0.18)'; e.currentTarget.style.borderColor = 'rgba(200,151,30,0.7)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(200,151,30,0.08)'; e.currentTarget.style.borderColor = 'rgba(200,151,30,0.4)'; }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                                List Property
+                            </a>
 
                             {/* Mobile Menu Toggle */}
                             <button
@@ -3059,7 +3155,24 @@ export default function App() {
                                         {label}
                                     </a>
                                 ))}
-                                <div style={{ marginTop: '1rem' }}>
+                                <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    {/* User or Partner Modal trigger */}
+                                    <button
+                                        onClick={() => {
+                                            setIsMobileMenuOpen(false);
+                                            setIsUserPartnerModalOpen(true);
+                                        }}
+                                        className="w-full text-center py-2.5 px-4 rounded-full border text-[11px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm"
+                                        style={{
+                                            background: 'linear-gradient(135deg, rgba(200,151,30,0.25), rgba(245,212,133,0.12))',
+                                            borderColor: 'rgba(200,151,30,0.5)',
+                                            color: '#c8971e'
+                                        }}
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                        Become User or Partner
+                                    </button>
+
                                     <button
                                         onClick={() => {
                                             setShowAmenities(false);
@@ -3070,6 +3183,16 @@ export default function App() {
                                     >
                                         Reserve Now
                                     </button>
+                                    <a
+                                        href={getAdminRegisterUrl()}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full text-center py-2.5 px-4 rounded-full border text-[11px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                                        style={{ color: 'var(--gold)', borderColor: 'rgba(200,151,30,0.4)', background: 'rgba(200,151,30,0.08)' }}
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
+                                        🏨 List Your Property
+                                    </a>
                                 </div>
                             </nav>
                         </div>
@@ -3101,7 +3224,7 @@ export default function App() {
                                     <img
                                         src={logoSrc}
                                         className="relative w-auto h-32 md:h-48 object-contain opacity-40 contrast-125 animate-[logo-pulse_3s_ease-in-out_infinite]"
-                                        alt="Zeebull Logo"
+                                        alt="Stayone Logo"
                                     />
                                 </div>
                                 <div className="mt-8 flex gap-2">
@@ -3125,13 +3248,13 @@ export default function App() {
                             <div className="w-full max-w-4xl mx-auto">
                                 <div className="animate-fade-in-up mb-4 sm:mb-6" style={{ animationDelay: '0.1s' }}>
                                     <span className="section-badge" style={{ color: 'rgba(232,213,163,0.9)', borderColor: 'rgba(201,168,76,0.6)', letterSpacing: '0.25em', fontSize: 'clamp(0.55rem, 1.5vw, 0.72rem)' }}>
-                                        {selectedBranch ? `${selectedBranch.name} — Select Below to Change` : 'The Zeebull Hospitality Collection'}
+                                        {selectedBranch ? `${selectedBranch.name} — Select Below to Change` : 'The Stayone Hospitality Collection'}
                                     </span>
                                 </div>
 
                                 <h1 className="animate-fade-in-up text-white uppercase drop-shadow-2xl leading-none mb-4 sm:mb-6"
                                     style={{ fontSize: 'clamp(2.5rem, 10vw, 5.5rem)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', animationDelay: '0.3s' }}>
-                                    {selectedBranch ? selectedBranch.name : 'Zeebull Hospitality'}
+                                    {selectedBranch ? selectedBranch.name : 'Stayone Hospitality'}
                                 </h1>
 
                                 <p className="animate-fade-in-up text-white/85 font-light mx-auto leading-relaxed mb-8"
@@ -3160,6 +3283,25 @@ export default function App() {
                                         style={{ fontSize: 'clamp(0.6rem, 1.8vw, 0.7rem)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.25)', padding: '0.7rem 1.4rem', borderRadius: '999px', cursor: 'pointer' }}
                                     >
                                         Explore Deals
+                                    </button>
+                                </div>
+
+                                {/* Hero Option: Become a User or Partner */}
+                                <div className="animate-fade-in-up mt-5 flex items-center justify-center" style={{ animationDelay: '0.75s' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsUserPartnerModalOpen(true)}
+                                        className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest transition-all duration-300 shadow-xl hover:scale-105 border group cursor-pointer"
+                                        style={{
+                                            background: 'linear-gradient(135deg, rgba(200,151,30,0.35), rgba(245,212,133,0.18))',
+                                            borderColor: 'rgba(245,212,133,0.65)',
+                                            color: '#f5d485',
+                                            backdropFilter: 'blur(12px)',
+                                        }}
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse group-hover:rotate-12 transition-transform" />
+                                        <span>Become a User or Partner</span>
+                                        <ChevronRight className="w-3.5 h-3.5 text-amber-300 group-hover:translate-x-0.5 transition-transform" />
                                     </button>
                                 </div>
 
@@ -3277,6 +3419,8 @@ export default function App() {
                                                     "https://images.unsplash.com/photo-1530521954074-e64f6810b32d?auto=format&fit=crop&q=80&w=800",
                                                 ][idx % 6]}
                                                 alt={branch.name}
+                                                loading="lazy"
+                                                decoding="async"
                                                 className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
                                             />
                                             {/* Refined Overlay Gradient */}
@@ -3412,6 +3556,8 @@ export default function App() {
                                                             <img
                                                                 src={currentImage ? getImageUrl(currentImage.image_url) : ITEM_PLACEHOLDER}
                                                                 alt={pkg.title}
+                                                                loading="lazy"
+                                                                decoding="async"
                                                                 style={{
                                                                     position: 'absolute',
                                                                     top: 0,
@@ -3560,6 +3706,8 @@ export default function App() {
                                                         <img
                                                             src={getImageUrl(currentImage)}
                                                             alt={room.type}
+                                                            loading="lazy"
+                                                            decoding="async"
                                                             style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.9s cubic-bezier(0.23,1,0.32,1)', filter: isBooked ? 'grayscale(40%)' : 'none' }}
                                                             className={isBooked ? '' : 'group-hover:scale-[1.05]'}
                                                             onError={(e) => { e.target.src = ITEM_PLACEHOLDER; }}
@@ -3765,6 +3913,8 @@ export default function App() {
                                                                     <img
                                                                         src={getImageUrl(currentImg)}
                                                                         alt={experience.title}
+                                                                        loading="lazy"
+                                                                        decoding="async"
                                                                         className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1500ms] ease-out group-hover:scale-[1.12]"
                                                                         onError={(e) => { e.target.src = ITEM_PLACEHOLDER; }}
                                                                     />
@@ -3891,6 +4041,8 @@ export default function App() {
                                             <img
                                                 src={getImageUrl(wedding.image_url)}
                                                 alt={wedding.title}
+                                                loading="lazy"
+                                                decoding="async"
                                                 className={`absolute inset-0 w-[110%] h-[110%] object-cover object-center transition-all duration-[10000ms] ease-in-out ${index === currentWeddingIndex ? 'opacity-100 scale-100' : 'opacity-0 scale-110'} animate-[slow-pan_20s_ease-in-out_infinite]`}
                                                 style={{
                                                     animationDelay: `${index * 2}s`,
@@ -4051,6 +4203,8 @@ export default function App() {
                                                                 <img
                                                                     src={getImageUrl(service.images[0].image_url)}
                                                                     alt={service.name}
+                                                                    loading="lazy"
+                                                                    decoding="async"
                                                                     style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.9s cubic-bezier(0.23,1,0.32,1)' }}
                                                                     className="group-hover:scale-[1.06]"
                                                                     onError={(e) => { e.target.src = ITEM_PLACEHOLDER; }}
@@ -4288,6 +4442,8 @@ export default function App() {
                                                             <img
                                                                 src={getImageUrl(image.image_url)}
                                                                 alt={image.caption || 'Gallery Image'}
+                                                                loading="lazy"
+                                                                decoding="async"
                                                                 style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.8s' }}
                                                                 className="group-hover:scale-110"
                                                                 onError={(e) => { e.target.src = ITEM_PLACEHOLDER; }}
@@ -4796,6 +4952,180 @@ export default function App() {
                                             )}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* User or Partner Choice Modal */}
+                {
+                    isUserPartnerModalOpen && (
+                        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsUserPartnerModalOpen(false)}>
+                            <div 
+                                className="w-full max-w-3xl rounded-3xl p-6 sm:p-8 md:p-10 border shadow-2xl relative transition-all my-8"
+                                style={{
+                                    background: 'linear-gradient(145deg, #111119 0%, #1a1a2e 50%, #14141f 100%)',
+                                    borderColor: 'rgba(200, 151, 30, 0.35)',
+                                    boxShadow: '0 25px 60px -15px rgba(0,0,0,0.9), 0 0 40px rgba(200,151,30,0.15)'
+                                }}
+                                onClick={e => e.stopPropagation()}
+                            >
+                                {/* Close Button */}
+                                <button 
+                                    onClick={() => setIsUserPartnerModalOpen(false)}
+                                    className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                                    aria-label="Close dialog"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+
+                                {/* Header */}
+                                <div className="text-center mb-8 pr-6 pl-6">
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-400/30 bg-amber-500/10 text-amber-300 text-[10px] font-bold uppercase tracking-[0.25em] mb-3">
+                                        <Sparkles className="w-3 h-3 text-amber-400" />
+                                        Welcome to StayOne
+                                    </div>
+                                    <h3 className="text-2xl sm:text-3xl font-display text-white font-bold tracking-wide">
+                                        Choose How You Experience <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #f5d485, #c8971e)' }}>StayOne</span>
+                                    </h3>
+                                    <p className="text-gray-400 text-sm mt-2 max-w-md mx-auto font-serif italic">
+                                        Select your journey below to get instant access to luxury stays or partner tools.
+                                    </p>
+                                </div>
+
+                                {/* Two Choices Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* 1. Guest / User Option */}
+                                    <div className="rounded-2xl p-6 border flex flex-col justify-between transition-all duration-300 hover:border-amber-400/50 hover:bg-white/[0.04]"
+                                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.12)' }}>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(200,151,30,0.15)', border: '1px solid rgba(200,151,30,0.3)' }}>
+                                                    <User className="w-6 h-6 text-amber-400" />
+                                                </div>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                    Guest & Member
+                                                </span>
+                                            </div>
+                                            <h4 className="text-lg font-bold text-white mb-2">I am a Guest / Traveler</h4>
+                                            <p className="text-gray-400 text-xs leading-relaxed mb-4">
+                                                Book luxury villas and rooms, order in-room dining, access digital concierge, and enjoy curated experiences.
+                                            </p>
+                                            <ul className="space-y-2 mb-6 text-xs text-gray-300">
+                                                <li className="flex items-center gap-2">
+                                                    <Check className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                                    Instant best-rate room reservations
+                                                </li>
+                                                <li className="flex items-center gap-2">
+                                                    <Check className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                                    QR dining & room service orders
+                                                </li>
+                                                <li className="flex items-center gap-2">
+                                                    <Check className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                                    Exclusive seasonal packages & deals
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="space-y-2 pt-2 border-t border-white/10">
+                                            <button
+                                                onClick={() => {
+                                                    setIsUserPartnerModalOpen(false);
+                                                    setShowAmenities(false);
+                                                    setIsGeneralBookingOpen(true);
+                                                }}
+                                                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-black transition-all flex items-center justify-center gap-2 shadow-md hover:brightness-110 cursor-pointer"
+                                                style={{ background: 'linear-gradient(135deg, #c8971e, #f5d485)' }}
+                                            >
+                                                <BedDouble className="w-4 h-4" />
+                                                Book a Room Now
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setIsUserPartnerModalOpen(false);
+                                                    const el = document.getElementById('properties');
+                                                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                                }}
+                                                className="w-full py-2 px-4 rounded-xl text-xs font-semibold text-gray-300 hover:text-white border border-white/15 hover:border-amber-400/40 bg-white/5 transition-all text-center cursor-pointer"
+                                            >
+                                                Explore Destinations
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. Partner / Hotel Owner Option */}
+                                    <div className="rounded-2xl p-6 border flex flex-col justify-between transition-all duration-300 hover:border-amber-400/60 hover:bg-amber-500/[0.06]"
+                                        style={{ background: 'rgba(200,151,30,0.06)', borderColor: 'rgba(200,151,30,0.3)' }}>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(200,151,30,0.25)', border: '1px solid rgba(200,151,30,0.4)' }}>
+                                                    <Building className="w-6 h-6 text-amber-300" />
+                                                </div>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                                                    Resort & Hotel Partner
+                                                </span>
+                                            </div>
+                                            <h4 className="text-lg font-bold text-white mb-2">I am a Hotel / Resort Owner</h4>
+                                            <p className="text-gray-400 text-xs leading-relaxed mb-4">
+                                                Run your property with StayOne's enterprise PMS, Aiosell Channel Manager, dynamic rates, and multi-branch control.
+                                            </p>
+                                            <ul className="space-y-2 mb-6 text-xs text-gray-300">
+                                                <li className="flex items-center gap-2">
+                                                    <Check className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                                    Aiosell OTA 2-way sync & inventory
+                                                </li>
+                                                <li className="flex items-center gap-2">
+                                                    <Check className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                                    Day-1 automated monthly billing (₹2,500/mo)
+                                                </li>
+                                                <li className="flex items-center gap-2">
+                                                    <Check className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                                    Staff & Owner Android/iOS mobile apps
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="space-y-2 pt-2 border-t border-amber-500/20">
+                                            <a
+                                                href={getAdminRegisterUrl()}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-white transition-all flex items-center justify-center gap-2 shadow-md hover:brightness-115 text-center"
+                                                style={{ background: 'linear-gradient(135deg, #7a5518, #c8971e)' }}
+                                            >
+                                                <Building className="w-4 h-4" />
+                                                Register Property (Partner)
+                                            </a>
+                                            <a
+                                                href={getAdminLoginUrl()}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full py-2 px-4 rounded-xl text-xs font-semibold text-amber-300 hover:text-white border border-amber-500/30 hover:border-amber-400 bg-amber-500/10 transition-all text-center block"
+                                            >
+                                                Owner / Staff Login &rarr;
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Bottom info footer */}
+                                <div className="mt-6 pt-4 border-t border-white/10 text-center text-xs text-gray-400 flex flex-wrap items-center justify-center gap-4">
+                                    <span>⚡ Instant activation upon admin approval</span>
+                                    <span>•</span>
+                                    <span>🔒 Secure cloud hosted on StayOne</span>
+                                    <span>•</span>
+                                    <a 
+                                        href="#partner" 
+                                        onClick={() => { 
+                                            setIsUserPartnerModalOpen(false); 
+                                            const el = document.getElementById('partner'); 
+                                            if (el) el.scrollIntoView({ behavior: 'smooth' }); 
+                                        }} 
+                                        className="text-amber-400 hover:underline cursor-pointer"
+                                    >
+                                        Learn more about partnership
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -5451,7 +5781,139 @@ export default function App() {
                     )
                 }
 
-                <footer data-contact-section className="bg-[#0f0f15] text-white py-20 px-4 md:px-12 mt-20 relative overflow-hidden">
+                {/* ═══════════════════════════════════════════════════ */}
+                {/* PARTNER / LIST YOUR PROPERTY SECTION               */}
+                {/* ═══════════════════════════════════════════════════ */}
+                <section id="partner" data-partner-section className="relative py-24 px-4 md:px-12 overflow-hidden scroll-mt-24" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f0f1a 100%)' }}>
+                    {/* Ambient glows */}
+                    <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-amber-500/8 blur-[150px] rounded-full pointer-events-none" />
+                    <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-indigo-500/6 blur-[120px] rounded-full pointer-events-none" />
+
+                    <div className="container mx-auto relative z-10">
+                        {/* Section eyebrow */}
+                        <div className="text-center mb-16">
+                            <span className="text-[10px] uppercase tracking-[0.4em] text-amber-500/70 font-bold">Join the StayOne Platform</span>
+                            <h2 className="text-3xl sm:text-4xl md:text-5xl font-display text-white mt-4 leading-tight">
+                                Grow With <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #f5d485, #c8971e)' }}>StayOne</span>
+                            </h2>
+                            <p className="text-gray-400 mt-4 max-w-2xl mx-auto text-base leading-relaxed font-serif italic">
+                                Whether you're a discerning traveler or a hospitality operator, StayOne has a place for you.
+                            </p>
+                        </div>
+
+                        {/* Two Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+
+                            {/* Guest Card */}
+                            <div className="group relative rounded-3xl p-8 md:p-10 border transition-all duration-500 cursor-pointer hover:-translate-y-1"
+                                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(16px)' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,151,30,0.4)'; e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                            >
+                                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6" style={{ background: 'rgba(200,151,30,0.15)', border: '1px solid rgba(200,151,30,0.25)' }}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="rgb(200,151,30)" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                </div>
+                                <h3 className="text-xl font-display text-white mb-3 tracking-wide">I'm a Guest</h3>
+                                <p className="text-gray-400 text-sm leading-relaxed mb-8">
+                                    Discover world-class resorts, book your perfect stay, and enjoy premium hospitality experiences crafted for the modern traveler.
+                                </p>
+                                <ul className="space-y-2 mb-8">
+                                    {['Instant room bookings', 'Exclusive member deals', 'Concierge & dining requests', 'Seamless check-in'].map(f => (
+                                        <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
+                                            <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(200,151,30,0.2)' }}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="rgb(200,151,30)" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                            </span>
+                                            {f}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <button
+                                    onClick={() => { setShowAmenities(false); setIsGeneralBookingOpen(true); }}
+                                    className="w-full py-3.5 rounded-xl text-sm font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2"
+                                    style={{ background: 'linear-gradient(135deg, #c8971e, #f5d485)', color: '#0a0a0f' }}
+                                    onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.1)'}
+                                    onMouseLeave={e => e.currentTarget.style.filter = 'brightness(1)'}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    Book a Stay
+                                </button>
+                            </div>
+
+                            {/* Partner Card */}
+                            <div className="group relative rounded-3xl p-8 md:p-10 border transition-all duration-500 cursor-pointer hover:-translate-y-1"
+                                style={{ background: 'rgba(200,151,30,0.05)', border: '1px solid rgba(200,151,30,0.2)', backdropFilter: 'blur(16px)' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,151,30,0.6)'; e.currentTarget.style.background = 'rgba(200,151,30,0.10)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(200,151,30,0.2)'; e.currentTarget.style.background = 'rgba(200,151,30,0.05)'; }}
+                            >
+                                {/* Recommended badge */}
+                                <div className="absolute top-5 right-5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest" style={{ background: 'rgba(200,151,30,0.2)', color: '#f5d485', border: '1px solid rgba(200,151,30,0.3)' }}>
+                                    For Owners
+                                </div>
+                                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6" style={{ background: 'rgba(200,151,30,0.2)', border: '1px solid rgba(200,151,30,0.35)' }}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="rgb(200,151,30)" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                </div>
+                                <h3 className="text-xl font-display text-white mb-3 tracking-wide">List Your Property</h3>
+                                <p className="text-gray-400 text-sm leading-relaxed mb-8">
+                                    Join the StayOne hospitality network. Reach thousands of travelers, manage bookings, sync with Aiosell OTAs, and grow your revenue — all in one platform.
+                                </p>
+                                <ul className="space-y-2 mb-8">
+                                    {['PMS + Channel Manager (Aiosell)', 'QR In-Room Dining & Services', 'Multi-branch management', 'Financial reports & GST invoicing', 'Mobile apps for staff & owners'].map(f => (
+                                        <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
+                                            <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(200,151,30,0.25)' }}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="rgb(200,151,30)" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                            </span>
+                                            {f}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <a
+                                    href={getAdminRegisterUrl()}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full py-3.5 rounded-xl text-sm font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2"
+                                    style={{ background: 'linear-gradient(135deg, #7a5518, #c8971e)', color: '#fff' }}
+                                    onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.15)'}
+                                    onMouseLeave={e => e.currentTarget.style.filter = 'brightness(1)'}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                    Register Your Property
+                                </a>
+
+                                <div className="text-center mt-3">
+                                    <a
+                                        href={getAdminLoginUrl()}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-amber-400/80 hover:text-amber-300 font-semibold transition-colors inline-flex items-center gap-1"
+                                    >
+                                        Already a partner? Sign in to Dashboard &rarr;
+                                    </a>
+                                </div>
+
+                                {/* Pricing note */}
+                                <p className="text-center text-[11px] text-amber-500/50 mt-3 font-medium">Starting at ₹2,500/month · No setup fees</p>
+                            </div>
+                        </div>
+
+                        {/* Stats row */}
+                        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto text-center">
+                            {[
+                                { value: '500+', label: 'Happy Guests' },
+                                { value: '10+', label: 'Partner Properties' },
+                                { value: '24/7', label: 'Support Available' },
+                                { value: '99%', label: 'Uptime Guarantee' },
+                            ].map(({ value, label }) => (
+                                <div key={label}>
+                                    <p className="text-2xl md:text-3xl font-display font-bold" style={{ color: '#f5d485' }}>{value}</p>
+                                    <p className="text-[11px] uppercase tracking-widest text-gray-500 mt-1">{label}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                <footer data-contact-section className="bg-[#0f0f15] text-white py-20 px-4 md:px-12 mt-0 relative overflow-hidden">
+
                     {/* Ambient glow */}
                     <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none"></div>
 
@@ -5461,12 +5923,12 @@ export default function App() {
                             <div className="lg:col-span-1 space-y-6">
                                 <div className="flex items-center gap-3">
                                     <div className="p-1 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                                        <img src={logoSrc} alt="Zeebull Group" className="h-12 w-auto" />
+                                        <img src={logoSrc} alt="Stayone Group" loading="lazy" decoding="async" className="h-12 w-auto object-contain" />
                                     </div>
-                                    <span className="text-xl font-display tracking-wider uppercase text-white">Zeebull <span className="text-amber-500">Group</span></span>
+                                    <span className="text-xl font-display tracking-wider uppercase text-white">Stayone <span className="text-amber-500">Group</span></span>
                                 </div>
                                 <p className="text-sm text-gray-400 leading-relaxed font-serif italic">
-                                    Crafting world-class sanctuaries for the discerning traveler. Zeebull Group represents the pinnacle of hospitality, serenity, and unparalleled service across our handpicked collection of resorts.
+                                    Crafting world-class sanctuaries for the discerning traveler. Stayone Group represents the pinnacle of hospitality, serenity, and unparalleled service across our handpicked collection of resorts.
                                 </p>
                                 <div className="flex space-x-5 pt-4">
                                     <a href="#" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-amber-500 hover:border-amber-500 transition-all duration-300 group">
@@ -5527,9 +5989,18 @@ export default function App() {
 
                         <div className="pt-10 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
                             <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-medium">
-                                &copy; {new Date().getFullYear()} Zeebull Business Group. All Rights Reserved.
+                                &copy; {new Date().getFullYear()} Stayone Business Group. All Rights Reserved.
                             </p>
-                            <div className="flex items-center gap-8">
+                            <div className="flex items-center gap-6 flex-wrap justify-center">
+                                <a
+                                    href={getAdminRegisterUrl()}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] uppercase tracking-[0.2em] text-amber-500/60 hover:text-amber-400 transition-colors font-bold flex items-center gap-1.5"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                    List Your Property
+                                </a>
                                 <a href="https://www.teqmates.com" className="flex items-center gap-2 group">
                                     <span className="text-[10px] uppercase tracking-[0.2em] text-gray-600 group-hover:text-gray-400 transition-colors">Powered by</span>
                                     <span className="text-[11px] font-black uppercase tracking-widest text-gray-500 group-hover:text-white transition-colors">www.teqmates.com</span>

@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Icon(Icons.spa, size: 64, color: Color(0xFF558B2F)),
                       const SizedBox(height: 16),
                       const Text(
-                        'Zeebull',
+                        'StayOne',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,

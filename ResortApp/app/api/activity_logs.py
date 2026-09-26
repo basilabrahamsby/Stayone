@@ -4,6 +4,7 @@ from app.database import get_db
 from app.models.activity_log import ActivityLog
 from app.models.user import User
 from app.utils.auth import get_current_user
+from app.utils.branch_scope import get_branch_id
 from typing import Optional
 from datetime import timezone, datetime, timedelta
 
@@ -19,13 +20,18 @@ def get_activity_logs(
     user_id: Optional[int] = None,
     hours: Optional[int] = Query(None, description="Filter logs from last N hours"),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
     """
-    Get activity logs with optional filters.
+    Get activity logs with optional filters and strict branch isolation.
     """
     # Query ActivityLog and User (Joined)
     query = db.query(ActivityLog, User).outerjoin(User, ActivityLog.user_id == User.id)
+    
+    # Apply branch filter
+    if branch_id is not None:
+        query = query.filter(ActivityLog.branch_id == branch_id)
     
     # Apply filters
     if method:
@@ -43,6 +49,7 @@ def get_activity_logs(
     if hours:
         time_threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
         query = query.filter(ActivityLog.timestamp >= time_threshold)
+
     
     # Order by most recent first
     query = query.order_by(ActivityLog.timestamp.desc())
@@ -82,47 +89,54 @@ def get_activity_logs(
 def get_activity_stats(
     hours: int = Query(24, description="Get stats from last N hours"),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
     """
-    Get activity statistics.
+    Get activity statistics with strict branch isolation.
     """
     time_threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
     
+    base_query = db.query(ActivityLog).filter(ActivityLog.timestamp >= time_threshold)
+    if branch_id is not None:
+        base_query = base_query.filter(ActivityLog.branch_id == branch_id)
+    
     # Total requests
-    total_requests = db.query(ActivityLog).filter(
-        ActivityLog.timestamp >= time_threshold
-    ).count()
+    total_requests = base_query.count()
     
     # Success rate (2xx status codes)
-    successful_requests = db.query(ActivityLog).filter(
-        ActivityLog.timestamp >= time_threshold,
+    successful_requests = base_query.filter(
         ActivityLog.status_code >= 200,
         ActivityLog.status_code < 300
     ).count()
     
     # Error rate (4xx and 5xx)
-    error_requests = db.query(ActivityLog).filter(
-        ActivityLog.timestamp >= time_threshold,
+    error_requests = base_query.filter(
         ActivityLog.status_code >= 400
     ).count()
     
     # Most common endpoints
     from sqlalchemy import func
-    common_endpoints = db.query(
+    common_endpoints_query = db.query(
         ActivityLog.path,
         func.count(ActivityLog.id).label('count')
     ).filter(
         ActivityLog.timestamp >= time_threshold
-    ).group_by(ActivityLog.path).order_by(func.count(ActivityLog.id).desc()).limit(10).all()
+    )
+    if branch_id is not None:
+        common_endpoints_query = common_endpoints_query.filter(ActivityLog.branch_id == branch_id)
+    common_endpoints = common_endpoints_query.group_by(ActivityLog.path).order_by(func.count(ActivityLog.id).desc()).limit(10).all()
     
     # Most common status codes
-    common_status_codes = db.query(
+    common_status_codes_query = db.query(
         ActivityLog.status_code,
         func.count(ActivityLog.id).label('count')
     ).filter(
         ActivityLog.timestamp >= time_threshold
-    ).group_by(ActivityLog.status_code).order_by(func.count(ActivityLog.id).desc()).limit(10).all()
+    )
+    if branch_id is not None:
+        common_status_codes_query = common_status_codes_query.filter(ActivityLog.branch_id == branch_id)
+    common_status_codes = common_status_codes_query.group_by(ActivityLog.status_code).order_by(func.count(ActivityLog.id).desc()).limit(10).all()
     
     return {
         "period_hours": hours,
@@ -134,3 +148,4 @@ def get_activity_stats(
         "top_endpoints": [{"path": path, "count": count} for path, count in common_endpoints],
         "status_codes": [{"code": code, "count": count} for code, count in common_status_codes]
     }
+

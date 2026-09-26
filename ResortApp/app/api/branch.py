@@ -37,11 +37,20 @@ def get_branches(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Retrieve all branches."""
-    # Only superadmins can request inactive branches
-    if include_inactive and not getattr(current_user, 'is_superadmin', False):
-        include_inactive = False
-        
+    """Retrieve branches scoped to user privileges."""
+    is_global_superadmin = getattr(current_user, 'is_superadmin', False) and current_user.branch_id is None
+    
+    if not is_global_superadmin:
+        # Branch admin / staff: return ONLY their corresponding branch
+        if current_user.branch_id is not None:
+            branch = branch_crud.get_branch_by_id(db, current_user.branch_id)
+            return [branch] if branch else []
+        elif getattr(current_user, "tenant_id", None) is not None:
+            from app.models.branch import Branch as BranchModel
+            return db.query(BranchModel).filter(BranchModel.tenant_id == current_user.tenant_id).all()
+        return []
+
+    # True universal superadmin with no branch lock: return all branches
     return branch_crud.get_branches(db, skip=skip, limit=limit, include_inactive=include_inactive)
 
 @router.get("/branches/{branch_id}", response_model=Branch)
@@ -51,6 +60,10 @@ def get_branch_by_id(
     current_user: User = Depends(get_current_user)
 ):
     """Get details for a specific branch."""
+    is_global_superadmin = getattr(current_user, 'is_superadmin', False) and current_user.branch_id is None
+    if not is_global_superadmin and current_user.branch_id is not None and current_user.branch_id != branch_id:
+        raise HTTPException(status_code=403, detail="Access denied: You can only view your corresponding branch details.")
+
     db_branch = branch_crud.get_branch_by_id(db, branch_id)
     if not db_branch:
         raise HTTPException(status_code=404, detail="Branch not found")
@@ -123,7 +136,13 @@ async def update_branch(
     
     update_data = {}
     if name is not None: update_data["name"] = name
-    if code is not None: update_data["code"] = code
+    if code is not None:
+        clean_code = code.strip().upper()
+        from app.models.branch import Branch as BranchModel
+        existing = db.query(BranchModel).filter(BranchModel.code == clean_code, BranchModel.id != branch_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Hotel / Branch code '{clean_code}' is already registered with another property.")
+        update_data["code"] = clean_code
     if address is not None: update_data["address"] = address
     if phone is not None: update_data["phone"] = phone
     if email is not None: update_data["email"] = email
@@ -141,6 +160,17 @@ async def update_branch(
     updated = branch_crud.update_branch(db, branch_id, **update_data)
     if not updated:
         raise HTTPException(status_code=404, detail="Branch not found")
+
+    # Keep parent tenant profile in sync
+    if updated.tenant_id:
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id == updated.tenant_id).first()
+        if tenant:
+            if name: tenant.name = name
+            if phone: tenant.contact_phone = phone
+            if email: tenant.contact_email = email
+            db.commit()
+
     return updated
 
 @router.delete("/branches/{branch_id}")

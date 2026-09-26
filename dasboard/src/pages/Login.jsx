@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
-import zeebullLogo from "../assets/zeebulllogo.png";
+import stayoneLogo from "../assets/stayonelogo.png";
 import { jwtDecode } from "jwt-decode";
 import { Mail, Lock, ArrowRight, Loader2, Sparkles, Building2, ShieldCheck } from "lucide-react";
 
@@ -96,8 +96,8 @@ export default function LoginPage() {
               {/* Enhanced Logo Container */}
               <div className="relative bg-white rounded-3xl p-3 shadow-xl transform transition-transform duration-500 group-hover:scale-105 border border-gray-100 ring-4 ring-gray-50 overflow-hidden">
                 <img
-                  src={zeebullLogo}
-                  alt="Zeebull Hospitality Logo"
+                  src={stayoneLogo}
+                  alt="Stayone Hospitality Logo"
                   className="h-24 w-auto object-contain"
                 />
               </div>
@@ -124,7 +124,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none"
-                  placeholder="name@zeebull.com"
+                  placeholder="name@stayone.com"
                   required
                 />
               </div>
@@ -182,11 +182,21 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* SaaS Self-Service Registration Callout */}
+          <div className="mt-6 pt-6 border-t border-gray-100 text-center">
+            <p className="text-xs text-gray-500">
+              New property or resort chain?{" "}
+              <Link to="/register" className="font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
+                Register Your Property &rarr;
+              </Link>
+            </p>
+          </div>
+
         </div>
 
         {/* Footer */}
         <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
-          <span>© {new Date().getFullYear()} Zeebull Group</span>
+          <span>© {new Date().getFullYear()} Stayone Group</span>
           <div className="flex items-center gap-1.5 font-medium text-gray-500">
             <ShieldCheck size={14} className="text-indigo-500" />
             Secure Login

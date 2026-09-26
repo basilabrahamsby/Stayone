@@ -350,7 +350,7 @@ export default function GuestRoomPortal({ roomId }) {
         {/* Footer info */}
         <div style={{ padding: "0 24px 40px", textAlign: "center" }}>
           <p style={{ fontSize: "0.6rem", color: "#4b5563", letterSpacing: "0.15em", textTransform: "uppercase", margin: 0 }}>
-            Luxury Awaits You at Zeebull
+            Luxury Awaits You at Stayone
           </p>
         </div>
       </div>
@@ -522,7 +522,7 @@ export default function GuestRoomPortal({ roomId }) {
       {/* ── Footer ── */}
       <div style={{ textAlign: "center", padding: "16px 20px 40px", borderTop: "1px solid #f1f5f9" }}>
         <div style={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 500 }}>
-          {resortName} · Powered by Zeebull
+          {resortName} · Powered by Stayone
         </div>
       </div>
 

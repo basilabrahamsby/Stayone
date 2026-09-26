@@ -43,8 +43,11 @@ def reconcile_stock(
     }
     
     try:
-        # Get all inventory items
-        items = db.query(InventoryItem).all()
+        # Get inventory items scoped to branch
+        items_query = db.query(InventoryItem)
+        if branch_id is not None:
+            items_query = items_query.filter(InventoryItem.branch_id == branch_id)
+        items = items_query.all()
         report["total_items_checked"] = len(items)
         
         for item in items:

@@ -29,14 +29,18 @@ def get_notifications(
     skip: int = 0,
     limit: int = 50,
     unread_only: bool = False,
-    user_id: Optional[int] = None
+    user_id: Optional[int] = None,
+    branch_id: Optional[int] = None
 ) -> List[Notification]:
-    """Get all notifications, optionally filtered by read status and user"""
+    """Get all notifications, optionally filtered by read status, user, and branch"""
     query = db.query(Notification)
+    from sqlalchemy import or_
     
+    if branch_id is not None:
+        query = query.filter(or_(Notification.branch_id == branch_id, Notification.branch_id == None))
+
     if user_id is not None:
         # Filter by recipient_id matching user_id OR global notifications (recipient_id is NULL)
-        from sqlalchemy import or_
         query = query.filter(or_(Notification.recipient_id == user_id, Notification.recipient_id == None))
         
     if unread_only:
@@ -57,12 +61,18 @@ def mark_notification_as_read(db: Session, notification_id: int) -> Optional[Not
         db.refresh(notification)
     return notification
 
-def mark_all_as_read(db: Session) -> int:
-    """Mark all notifications as read"""
-    count = db.query(Notification).filter(Notification.is_read == False).update({
+def mark_all_as_read(db: Session, user_id: Optional[int] = None, branch_id: Optional[int] = None) -> int:
+    """Mark all notifications as read for current user/branch"""
+    from sqlalchemy import or_
+    query = db.query(Notification).filter(Notification.is_read == False)
+    if branch_id is not None:
+        query = query.filter(or_(Notification.branch_id == branch_id, Notification.branch_id == None))
+    if user_id is not None:
+        query = query.filter(or_(Notification.recipient_id == user_id, Notification.recipient_id == None))
+    count = query.update({
         "is_read": True,
         "read_at": datetime.now(timezone.utc)
-    })
+    }, synchronize_session=False)
     db.commit()
     return count
 
@@ -75,17 +85,25 @@ def delete_notification(db: Session, notification_id: int) -> bool:
         return True
     return False
 
-def clear_all_notifications(db: Session) -> int:
-    """Delete all notifications"""
-    count = db.query(Notification).delete()
+def clear_all_notifications(db: Session, user_id: Optional[int] = None, branch_id: Optional[int] = None) -> int:
+    """Delete all notifications for current user/branch"""
+    from sqlalchemy import or_
+    query = db.query(Notification)
+    if branch_id is not None:
+        query = query.filter(or_(Notification.branch_id == branch_id, Notification.branch_id == None))
+    if user_id is not None:
+        query = query.filter(or_(Notification.recipient_id == user_id, Notification.recipient_id == None))
+    count = query.delete(synchronize_session=False)
     db.commit()
     return count
 
-def get_unread_count(db: Session, user_id: Optional[int] = None) -> int:
+def get_unread_count(db: Session, user_id: Optional[int] = None, branch_id: Optional[int] = None) -> int:
     """Get count of unread notifications"""
+    from sqlalchemy import or_
     query = db.query(Notification).filter(Notification.is_read == False)
+    if branch_id is not None:
+        query = query.filter(or_(Notification.branch_id == branch_id, Notification.branch_id == None))
     if user_id is not None:
-        from sqlalchemy import or_
         query = query.filter(or_(Notification.recipient_id == user_id, Notification.recipient_id == None))
     return query.count()
 

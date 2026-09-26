@@ -29,6 +29,28 @@ def login(request: LoginRequest, db: Session = Depends(auth.get_db)):
             print(f"Login attempt: User {request.email} is inactive")
             raise HTTPException(status_code=400, detail="Account is inactive. Please contact administrator.")
         
+        # Check if user's property/tenant workspace has been disabled
+        if getattr(user, 'tenant_id', None) and not getattr(user, 'is_superadmin', False):
+            from app.models.tenant import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+            if tenant and not tenant.is_active:
+                print(f"Login attempt: Property '{tenant.name}' is disabled")
+                raise HTTPException(status_code=403, detail=f"The property workspace '{tenant.name}' has been disabled by platform administration. Please contact support.")
+        
+        # Check if user's branch has been disabled
+        if getattr(user, 'branch_id', None) and not getattr(user, 'is_superadmin', False):
+            from app.models.branch import Branch
+            from app.models.tenant import Tenant
+            user_branch = db.query(Branch).filter(Branch.id == user.branch_id).first()
+            if not user_branch or not user_branch.is_active:
+                print(f"Login attempt: Branch '{user_branch.name if user_branch else user.branch_id}' is disabled")
+                raise HTTPException(status_code=403, detail=f"Access denied: Branch '{user_branch.name if user_branch else user.branch_id}' has been disabled by platform administration. Please contact support.")
+            if user_branch.tenant_id:
+                branch_tenant = db.query(Tenant).filter(Tenant.id == user_branch.tenant_id).first()
+                if branch_tenant and not branch_tenant.is_active:
+                    print(f"Login attempt: Property '{branch_tenant.name}' is disabled")
+                    raise HTTPException(status_code=403, detail=f"The property workspace '{branch_tenant.name}' has been disabled by platform administration. Please contact support.")
+
         # Check if user has a role
         if not user.role:
             print(f"Login attempt: User {request.email} has no role assigned")

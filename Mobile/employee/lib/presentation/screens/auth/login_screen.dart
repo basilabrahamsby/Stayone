@@ -124,14 +124,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.white.withOpacity(0.1),
                         ),
                         child: Image.asset(
-                          'assets/zeebulllogo.png',
+                          'assets/stayonelogo.png',
                           height: 100,
                           fit: BoxFit.contain,
                         ),
                       ),
                       const SizedBox(height: 24),
                       const Text(
-                        'Zeebull Hospitality',
+                        'StayOne Hospitality',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 28,

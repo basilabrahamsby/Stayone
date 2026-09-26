@@ -11,6 +11,7 @@ from datetime import datetime
 from app.utils.date_utils import get_ist_now, get_ist_today
 from app.database import get_db
 from app.utils.auth import get_current_user
+from app.utils.branch_scope import get_branch_id
 from app.models.legal import LegalDocument
 from app.models.branch import Branch
 from pydantic import BaseModel
@@ -40,9 +41,9 @@ async def upload_legal_document(
     description: str = Form(None),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_user),
-    x_branch_id: Optional[str] = Header(None)
+    branch_id: int = Depends(get_branch_id)
 ):
-    print(f"[DEBUG] Uploading legal document: {name} for branch {x_branch_id}")
+    print(f"[DEBUG] Uploading legal document: {name} for branch {branch_id}")
     # Generate unique filename
     timestamp = get_ist_now().strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}_{file.filename}"
@@ -52,13 +53,6 @@ async def upload_legal_document(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # Determine branch
-    branch_id = 1 # Fallback
-    if x_branch_id and x_branch_id != "all":
-        branch_id = int(x_branch_id)
-    elif hasattr(current_user, "branch_id"):
-        branch_id = current_user.branch_id
-
     # Store relative path for static serving
     relative_path = f"uploads/legal/{filename}"
     print(f"[DEBUG-UPLOAD] Storing path: '{relative_path}'")
@@ -81,18 +75,13 @@ async def upload_legal_document(
 def get_legal_documents(
     db: Session = Depends(get_db), 
     current_user: Any = Depends(get_current_user),
-    x_branch_id: Optional[str] = Header(None)
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
-    print(f"[DEBUG] Fetching legal documents. User role: {getattr(current_user.role, 'name', 'N/A')}, Branch header: {x_branch_id}")
+    print(f"[DEBUG] Fetching legal documents for branch: {branch_id}")
     query = db.query(LegalDocument)
     
-    user_role = getattr(current_user.role, "name", "").lower() if current_user.role else ""
-    
-    if user_role == "superadmin" or getattr(current_user, "is_superadmin", False):
-        if x_branch_id and x_branch_id != 'all':
-            query = query.filter(LegalDocument.branch_id == int(x_branch_id))
-    else:
-        query = query.filter(LegalDocument.branch_id == current_user.branch_id)
+    if branch_id is not None:
+        query = query.filter(LegalDocument.branch_id == branch_id)
     
     docs = query.order_by(LegalDocument.uploaded_at.desc()).all()
     

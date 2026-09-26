@@ -106,7 +106,7 @@ async def aiosell_full_sync(
 
 
 def _map_room_type(db: Session, room_code: str, branch_id: int = None):
-    """Helper to map Aiosell roomCode to Zeebull RoomType, optionally searching across all branches"""
+    """Helper to map Aiosell roomCode to Stayone RoomType, optionally searching across all branches"""
     if not room_code:
         return None
         
@@ -601,7 +601,13 @@ async def api_mark_noshow(
     ext_id = booking.external_id or booking.display_id or str(booking.id)
     if ext_id:
         from app.core.aiosell_client import push_mark_noshow
-        aiosell_result = push_mark_noshow(ext_id, booking.source or "booking.com")
+        from app.models.branch import Branch
+        b_code = None
+        if booking.branch_id:
+            br = db.query(Branch).filter(Branch.id == booking.branch_id).first()
+            if br and br.code:
+                b_code = br.code
+        aiosell_result = push_mark_noshow(ext_id, booking.source or "booking.com", hotel_code=b_code)
         
     # Trigger inventory push so room availability updates back on OTAs
     if booking.room_type_id:

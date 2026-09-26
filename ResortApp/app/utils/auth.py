@@ -103,7 +103,13 @@ def get_current_user(
         raise credentials_exception
 
     try:
-        user = db.query(User).options(joinedload(User.role)).filter(User.id == user_id).first()
+        from app.models.branch import Branch
+        user = db.query(User).options(
+            joinedload(User.role),
+            joinedload(User.tenant),
+            joinedload(User.branch).joinedload(Branch.tenant)
+        ).filter(User.id == user_id).first()
+
         if user is None:
             print(f"[AUTH DEBUG] User ID {user_id} not found in database")
             raise credentials_exception
@@ -115,12 +121,39 @@ def get_current_user(
                 detail="User role not found. Please contact administrator."
             )
             
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account has been deactivated."
+            )
+
+        # In-memory check: Verify tenant workspace is active
+        if user.tenant and not getattr(user, 'is_superadmin', False):
+            if not user.tenant.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"This property workspace '{user.tenant.name}' has been disabled by platform administration."
+                )
+
+        # In-memory check: Verify assigned branch and its parent tenant are active
+        if user.branch_id is not None and not getattr(user, 'is_superadmin', False):
+            user_branch = user.branch
+            if not user_branch or not user_branch.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access denied: Branch '{user_branch.name if user_branch else user.branch_id}' has been disabled by platform administration."
+                )
+            if user_branch.tenant and not user_branch.tenant.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access denied: Property workspace '{user_branch.tenant.name}' has been disabled by platform administration."
+                )
+
         # Store user info in request state for logging and scoping
         request.state.user_id = user.id
         request.state.branch_id = user.branch_id
         request.state.is_superadmin = getattr(user, 'is_superadmin', False)
 
-        
         # print(f"[AUTH DEBUG] User verified: {user.email}")
         return user
         
@@ -135,11 +168,12 @@ def get_current_user(
 
 def get_branch_id(
     request: Request,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ) -> Optional[int]:
-    # 1. If superadmin or Manager/Owner/Admin, allow override via header or query param
-    user_role = current_user.role.name.lower() if current_user.role else ""
-    if getattr(current_user, 'is_superadmin', False) or user_role in ["manager", "owner", "admin", "superadmin"]:
+    # 1. If global superadmin without branch_id, allow override via header
+    is_global_superadmin = getattr(current_user, 'is_superadmin', False) and current_user.branch_id is None
+    if is_global_superadmin:
         branch_header = request.headers.get("X-Branch-ID")
         if branch_header == "all":
             return None
@@ -148,13 +182,27 @@ def get_branch_id(
                 return int(branch_header)
             except ValueError:
                 pass
-        
-        # Permit returning None/their branch_id
-        return getattr(current_user, 'branch_id', None)
+        return None
     
-    # 2. Otherwise, return user's fixed branch_id
+    # 2. Otherwise, strictly return user's fixed branch_id
     if getattr(current_user, 'branch_id', None) is None:
         raise HTTPException(status_code=403, detail="User not assigned to a branch")
+    
+    from app.models.branch import Branch
+    from app.models.tenant import Tenant
+    branch = db.query(Branch).filter(Branch.id == current_user.branch_id).first()
+    if not branch or not branch.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: Branch '{branch.name if branch else current_user.branch_id}' has been disabled by platform administration."
+        )
+    if branch.tenant_id:
+        tenant = db.query(Tenant).filter(Tenant.id == branch.tenant_id).first()
+        if tenant and not tenant.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: Property workspace '{tenant.name}' has been disabled by platform administration."
+            )
     return current_user.branch_id
 
 def verify_superadmin(current_user: User = Depends(get_current_user)) -> User:
@@ -169,14 +217,15 @@ def verify_superadmin(current_user: User = Depends(get_current_user)) -> User:
 def has_permission(user: User, required_permission: str) -> bool:
     """
     Check if a user has a specific permission.
-    Superadmins and 'admin' roles bypass all checks.
+    Superadmins and admin/owner roles bypass all checks.
     Otherwise, checks against the role's parsed permissions_list.
     """
     if getattr(user, 'is_superadmin', False):
         return True
         
     if user.role:
-        if user.role.name.lower() in ["admin", "superadmin"]:
+        role_lower = user.role.name.lower()
+        if "admin" in role_lower or "owner" in role_lower or role_lower in ["manager", "superadmin"]:
             return True
             
         # permissions_list is a property on Role that returns a list of strings

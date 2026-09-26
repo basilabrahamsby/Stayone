@@ -1,0 +1,37 @@
+# Version control
+.git
+.gitignore
+
+# Virtual environments & dependencies
+venv/
+.venv/
+**/node_modules/
+**/build/
+**/dist/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Large archives and database dumps
+*.zip
+*.tar.gz
+*.bak
+*.backup
+*.sql
+*.dump
+*.aab
+
+# Logs and temporary files
+*.log
+tmp/
+temp_*/
+scratch/
+.pytest_cache/
+.coverage
+
+# IDE configs
+.agent/
+.gemini/
+.vscode/
+.idea/

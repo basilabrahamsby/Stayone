@@ -276,6 +276,8 @@ def get_user_history(
     user = db.query(models.User).options(joinedload(models.User.role)).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if branch_id is not None and user.branch_id is not None and user.branch_id != branch_id:
+        raise HTTPException(status_code=403, detail="Access denied: user belongs to another branch")
 
     activities = []
 

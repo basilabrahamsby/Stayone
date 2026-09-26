@@ -5,6 +5,33 @@
 /* Import responsive styles */
 @import './styles/responsive.css';
 
+:root {
+  --font-display: 'Cinzel', serif;
+  --font-serif: 'Playfair Display', serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --gold: #c8971e;
+  --gold-light: #f5d485;
+  --obsidian: #0a0a0f;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  overflow-x: hidden;
+  background-color: #0a0a0f;
+  color: #f3f4f6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent layout shifts */
+img {
+  content-visibility: auto;
+}
+
 /* Make date inputs fully clickable - click anywhere to open calendar */
 input[type="date"] {
   cursor: pointer;

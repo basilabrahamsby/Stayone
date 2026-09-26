@@ -1,50 +1,41 @@
-# Use Python 3.11 slim image
+# Use Python 3.11 slim base image
 FROM python:3.11-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
 
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies needed for compiling psycopg2, cryptography, etc.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
-        g++ \
         libpq-dev \
-        libffi-dev \
-        libssl-dev \
         curl \
-        git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements_production.txt .
+# Copy requirements file first for layer caching
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements_production.txt
+    && pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
+# Copy source code
 COPY . .
 
-# Create necessary directories
+# Ensure storage directories exist
 RUN mkdir -p uploads static logs
 
-# Create non-root user
-RUN adduser --disabled-password --gecos '' appuser \
-    && chown -R appuser:appuser /app
-USER appuser
+# Expose backend port
+EXPOSE 8011
 
-# Expose port
-EXPOSE 8000
+# Health check endpoint
+HEALTHCHECK --interval=20s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8011/health || exit 1
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Command to run the application
-CMD ["gunicorn", "main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-"]
+# Default command for local development with live auto-reloading
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8011", "--reload"]

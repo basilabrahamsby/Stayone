@@ -408,7 +408,7 @@ class _RoomListScreenState extends State<RoomListScreen> with SingleTickerProvid
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'ZEEBULL',
+                  'STAYONE',
                   style: TextStyle(
                     fontSize: 8,
                     fontWeight: FontWeight.bold,

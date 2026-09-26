@@ -165,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ],
                         ),
                         child: Image.asset(
-                          'assets/zeebulllogo.png',
+                          'assets/stayonelogo.png',
                           height: 100,
                           fit: BoxFit.contain,
                         ),

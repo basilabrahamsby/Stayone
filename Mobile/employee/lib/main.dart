@@ -205,7 +205,7 @@ class ForceUpdateScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'To continue using the Zeebull Employee app, please update to the latest version from the Play Store.',
+                'To continue using the StayOne Employee app, please update to the latest version from the Play Store.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.6),

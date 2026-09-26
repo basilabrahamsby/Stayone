@@ -29,7 +29,7 @@
     <uses-feature android:name="android.hardware.location.network" android:required="false"/>
 
     <application
-        android:label="Zeebull Team"
+        android:label="StayOne Team"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"

@@ -28,6 +28,7 @@ class Role(Base):
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     name = Column(String)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
@@ -37,6 +38,7 @@ class User(Base):
     branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True) # null for superadmin
     is_superadmin = Column(Boolean, default=False)
     
+    tenant = relationship("Tenant", back_populates="users")
     branch = relationship("Branch")
 
     bookings = relationship("Booking", back_populates="user")

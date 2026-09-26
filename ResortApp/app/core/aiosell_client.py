@@ -54,7 +54,7 @@ def _send_push(payload: dict, endpoint_type: str, url: str):
         return False
 
 
-def push_inventory(room_code: str, available_qty: int, start_date: date, end_date: date = None):
+def push_inventory(room_code: str, available_qty: int, start_date: date, end_date: date = None, hotel_code: str = None):
     """
     Pushes inventory availability for a specific room type mapping.
     """
@@ -65,7 +65,7 @@ def push_inventory(room_code: str, available_qty: int, start_date: date, end_dat
     str_end = end_date.strftime("%Y-%m-%d")
     
     payload = {
-        "hotelCode": HOTEL_CODE,
+        "hotelCode": hotel_code or HOTEL_CODE,
         "updates": [
             {
                 "startDate": str_start,
@@ -80,11 +80,11 @@ def push_inventory(room_code: str, available_qty: int, start_date: date, end_dat
         ]
     }
     
-    logger.info(f"[AIOSELL] Pushing Inventory: Room={room_code}, Available={available_qty}, Date={str_start}")
+    logger.info(f"[AIOSELL] Pushing Inventory: Hotel={hotel_code or HOTEL_CODE}, Room={room_code}, Available={available_qty}, Date={str_start}")
     return _send_push(payload, "Inventory", API_URL_INVENTORY)
 
 
-def push_rate(room_code: str, base_price: float, start_date: date, end_date: date = None, rate_plan_code: str = "EP", extra_adult: float = 0.0, extra_child: float = 0.0):
+def push_rate(room_code: str, base_price: float, start_date: date, end_date: date = None, rate_plan_code: str = "EP", extra_adult: float = 0.0, extra_child: float = 0.0, hotel_code: str = None):
     """
     Pushes rates for a specific room type mapping including extra adult and extra child prices.
     """
@@ -105,7 +105,7 @@ def push_rate(room_code: str, base_price: float, start_date: date, end_date: dat
         rate_entry["extraChild"] = float(extra_child)
     
     payload = {
-        "hotelCode": HOTEL_CODE,
+        "hotelCode": hotel_code or HOTEL_CODE,
         "updates": [
             {
                 "startDate": str_start,
@@ -115,10 +115,11 @@ def push_rate(room_code: str, base_price: float, start_date: date, end_date: dat
         ]
     }
     
-    logger.info(f"[AIOSELL] Pushing Rate: Room={room_code}, Plan={rate_plan_code}, Rate={base_price}, ExtraAdult={extra_adult}, ExtraChild={extra_child}, Date={str_start}")
+    logger.info(f"[AIOSELL] Pushing Rate: Hotel={hotel_code or HOTEL_CODE}, Room={room_code}, Plan={rate_plan_code}, Rate={base_price}, ExtraAdult={extra_adult}, ExtraChild={extra_child}, Date={str_start}")
     return _send_push(payload, "Rate", API_URL_RATES)
 
-def batch_push_rates(rate_data: list):
+
+def batch_push_rates(rate_data: list, hotel_code: str = None):
     """
     Accepts a list of dictionaries to push multiple rates or dates at once:
     [{ "room_code": "SUITE", "rate": 5000.0, "start_date": Date, "end_date": Date, "rate_plan_code": "EP", "extra_adult": 1200.0, "extra_child": 600.0 }]
@@ -151,12 +152,12 @@ def batch_push_rates(rate_data: list):
         })
         
     payload = {
-        "hotelCode": HOTEL_CODE,
+        "hotelCode": hotel_code or HOTEL_CODE,
         "updates": updates
     }
     return _send_push(payload, "Batch Rates", API_URL_RATES)
 
-def batch_push_inventory(availability_data: list):
+def batch_push_inventory(availability_data: list, hotel_code: str = None):
     """
     Accepts a list of dictionaries to push multiple rooms or dates at once:
     [{ "room_code": "SUITE", "qty": 5, "start_date": Date, "end_date": Date }]
@@ -181,14 +182,14 @@ def batch_push_inventory(availability_data: list):
         })
         
     payload = {
-        "hotelCode": HOTEL_CODE,
+        "hotelCode": hotel_code or HOTEL_CODE,
         "updates": updates
     }
     return _send_push(payload, "Batch Inventory", API_URL_INVENTORY)
 
 
 def push_restriction(room_code: str, start_date: date, end_date: date = None, 
-                     stop_sell: bool = False, min_stay: int = None, max_stay: int = None):
+                     stop_sell: bool = False, min_stay: int = None, max_stay: int = None, hotel_code: str = None):
     """
     Pushes restrictions (Stop Sell, Min Stay, etc.) to Aiosell v2 API.
     Used for Stop Sell, Min/Max Stay, etc.
@@ -202,7 +203,7 @@ def push_restriction(room_code: str, start_date: date, end_date: date = None,
         end_date = start_date
         
     payload = {
-        "hotelCode": HOTEL_CODE,
+        "hotelCode": hotel_code or HOTEL_CODE,
         "updates": [
             {
                 "startDate": start_date.strftime("%Y-%m-%d"),
@@ -219,11 +220,11 @@ def push_restriction(room_code: str, start_date: date, end_date: date = None,
         ]
     }
     
-    logger.info(f"[AIOSELL] Pushing Restrictions: Room={room_code}, StopSell={stop_sell}")
+    logger.info(f"[AIOSELL] Pushing Restrictions: Hotel={hotel_code or HOTEL_CODE}, Room={room_code}, StopSell={stop_sell}")
     return _send_push(payload, "Restrictions", API_URL_INVENTORY)
 
 
-def push_mark_noshow(booking_id: str, channel: str = "booking.com"):
+def push_mark_noshow(booking_id: str, channel: str = "booking.com", hotel_code: str = None):
     """
     Marks a booking as no-show in Aiosell CM API v2.
     Endpoint: POST https://live.aiosell.com/api/v2/cm/marknoshow/{PARTNER_ID}
@@ -245,11 +246,11 @@ def push_mark_noshow(booking_id: str, channel: str = "booking.com"):
         norm_channel = clean_channel
         
     payload = {
-        "hotelCode": HOTEL_CODE,
+        "hotelCode": hotel_code or HOTEL_CODE,
         "bookingId": str(booking_id),
         "channel": norm_channel
     }
     
-    logger.info(f"[AIOSELL] Pushing Mark No-Show: BookingID={booking_id}, Channel={norm_channel}, Hotel={HOTEL_CODE}")
+    logger.info(f"[AIOSELL] Pushing Mark No-Show: BookingID={booking_id}, Channel={norm_channel}, Hotel={hotel_code or HOTEL_CODE}")
     return _send_push(payload, "Mark No-Show", url)
 

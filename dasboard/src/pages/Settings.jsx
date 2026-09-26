@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
 import api from "../services/api";
-import { Settings as SettingsIcon, FileText, Upload, Trash2, Download, Save, Globe, Calendar as CalendarIcon, Plus, Eye, Percent, Zap, ZapOff } from "lucide-react";
+import { Settings as SettingsIcon, FileText, Upload, Trash2, Download, Save, Globe, Calendar as CalendarIcon, Plus, Eye, Percent, Zap, ZapOff, CreditCard } from "lucide-react";
 import { formatDateIST } from "../utils/dateUtils";
 import { useBranch } from "../contexts/BranchContext";
 
@@ -24,7 +24,7 @@ export default function Settings() {
         gst_slab_rate_3: "18",
         gst_inclusive: "false",
         mobile_app_min_version: "1.2.1",
-        mobile_app_play_store_url: "https://play.google.com/store/apps/details?id=com.teqmates.zeebull_employee",
+        mobile_app_play_store_url: "https://play.google.com/store/apps/details?id=com.teqmates.stayone_employee",
         mobile_app_force_update: "true"
     });
     const [settingsLoading, setSettingsLoading] = useState(false);
@@ -38,6 +38,36 @@ export default function Settings() {
         file: null
     });
     const [loadingLegal, setLoadingLegal] = useState(false);
+
+    // Load billing info
+    const [billingInfo, setBillingInfo] = useState(null);
+    const [billingLoading, setBillingLoading] = useState(false);
+    const [payingBill, setPayingBill] = useState(false);
+
+    const fetchBillingInfo = async () => {
+        setBillingLoading(true);
+        try {
+            const res = await api.get("/saas/billing");
+            setBillingInfo(res.data);
+        } catch (e) {
+            setBillingInfo(null);
+        } finally {
+            setBillingLoading(false);
+        }
+    };
+
+    const handlePayBill = async () => {
+        setPayingBill(true);
+        try {
+            await api.post("/saas/pay-bill");
+            alert("✅ Payment recorded successfully!");
+            fetchBillingInfo();
+        } catch (e) {
+            alert(e.response?.data?.detail || "Payment failed. Please try again.");
+        } finally {
+            setPayingBill(false);
+        }
+    };
 
     // Pricing Calendar State
     const [calendarEvents, setCalendarEvents] = useState([]);
@@ -249,6 +279,8 @@ export default function Settings() {
             fetchLegalDocuments();
         } else if (activeTab === "pricing_calendar") {
             fetchCalendarEvents();
+        } else if (activeTab === "billing") {
+            fetchBillingInfo();
         }
     }, [activeTab, activeBranchId]);
 
@@ -306,6 +338,16 @@ export default function Settings() {
                             >
                                 <CalendarIcon className="inline mr-2" size={18} />
                                 Pricing Calendar
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("billing")}
+                                className={`px-6 py-3 font-medium rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "billing"
+                                    ? "bg-indigo-600 text-white"
+                                    : "text-gray-600 hover:bg-gray-100"
+                                    }`}
+                            >
+                                <CreditCard className="inline mr-2" size={18} />
+                                Property Billing
                             </button>
                         </div>
                     </div>
@@ -897,6 +939,78 @@ export default function Settings() {
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Property Billing & Subscription Tab */}
+                {activeTab === "billing" && (
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
+                                <CreditCard className="text-indigo-600" size={22} />
+                                Property Billing &amp; Subscription
+                            </h2>
+                            <p className="text-gray-500 text-sm mb-6">View your monthly plan, Aiosell branch code, and pay your invoice.</p>
+
+                            {billingLoading ? (
+                                <div className="text-center py-12 text-gray-400">Loading billing info...</div>
+                            ) : billingInfo ? (
+                                <div className="max-w-lg space-y-4">
+                                    {/* Status Banner */}
+                                    <div className={`p-4 rounded-xl border-2 ${billingInfo.subscription_status === 'active' ? 'bg-emerald-50 border-emerald-300' : billingInfo.subscription_status === 'pending_approval' ? 'bg-amber-50 border-amber-300' : 'bg-red-50 border-red-300'}`}>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-2xl`}>{billingInfo.subscription_status === 'active' ? '✅' : billingInfo.subscription_status === 'pending_approval' ? '⏳' : '❌'}</span>
+                                            <div>
+                                                <p className="font-bold text-gray-900 capitalize">{billingInfo.subscription_status?.replace(/_/g, ' ')}</p>
+                                                <p className="text-xs text-gray-600 mt-0.5">
+                                                    {billingInfo.subscription_status === 'active' ? 'Your property is active and fully operational.' :
+                                                     billingInfo.subscription_status === 'pending_approval' ? 'Awaiting admin approval. You can still view and pay your bill.' :
+                                                     'Your subscription is inactive. Please contact support.'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Billing Details */}
+                                    <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                                        {[
+                                            { label: 'Plan', value: <span className="capitalize font-semibold">{billingInfo.plan || 'starter'}</span> },
+                                            { label: 'Aiosell Branch Code / Hotel Code', value: <span className="font-mono font-bold text-indigo-700 tracking-wider">{billingInfo.branch_code || '—'}</span> },
+                                            { label: 'Monthly Fee', value: <span className="font-bold text-gray-900">₹{billingInfo.monthly_amount?.toLocaleString() || '—'}</span> },
+                                            { label: 'Payment Status', value: <span className={`font-bold ${billingInfo.payment_status === 'paid' ? 'text-emerald-600' : 'text-red-500'}`}>{billingInfo.payment_status === 'paid' ? '✅ Paid' : '⚠️ Unpaid'}</span> },
+                                            ...(billingInfo.next_billing_date ? [{ label: 'Next Billing Date', value: <span className="font-semibold">{billingInfo.next_billing_date}</span> }] : []),
+                                            ...(billingInfo.last_billed_at ? [{ label: 'Last Billed', value: <span className="text-gray-600">{billingInfo.last_billed_at}</span> }] : []),
+                                        ].map(({ label, value }) => (
+                                            <div key={label} className="flex items-center justify-between px-4 py-3 bg-white">
+                                                <span className="text-sm text-gray-500">{label}</span>
+                                                <span className="text-sm">{value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {billingInfo.payment_status !== 'paid' && (
+                                        <button
+                                            onClick={handlePayBill}
+                                            disabled={payingBill}
+                                            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 text-base shadow-lg shadow-indigo-200"
+                                        >
+                                            {payingBill ? (
+                                                <><svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Processing Payment...</>
+                                            ) : (
+                                                <><CreditCard size={18} /> Pay Monthly Bill (₹{billingInfo.monthly_amount?.toLocaleString() || '—'})</>
+                                            )}
+                                        </button>
+                                    )}
+
+                                    <p className="text-xs text-gray-400 text-center">Billing is monthly. Contact support for plan changes or queries.</p>
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 text-gray-400">
+                                    <CreditCard size={48} className="mx-auto mb-3 opacity-30" />
+                                    <p>No billing information available. This may be a staff account.</p>
                                 </div>
                             )}
                         </div>

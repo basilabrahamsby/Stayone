@@ -1,4 +1,4 @@
-from ast import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
@@ -6,6 +6,7 @@ from app.schemas.user import UserCreate, UserOut, AdminSetupRequest, RoleCreate
 from app.curd import user as crud_user
 from app.curd import role as crud_role
 from app.utils.auth import get_current_user, verify_superadmin
+from app.utils.branch_scope import get_branch_id
 from app.models.user import User, Role
 from sqlalchemy.orm import joinedload
 
@@ -25,12 +26,28 @@ def read_current_user(current_user = Depends(get_current_user)):
 def register_user(
     user: UserCreate, 
     db: Session = Depends(get_db),
-    admin: User = Depends(verify_superadmin) # Only superadmin can create users natively
+    current_user: User = Depends(get_current_user),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
+    # Only superadmin or branch admin/owner can register users
+    is_superadmin = getattr(current_user, 'is_superadmin', False) and current_user.branch_id is None
+    role_name = (current_user.role.name.lower() if current_user.role else "")
+    is_admin = is_superadmin or "admin" in role_name or "owner" in role_name
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required to register users.")
+
+    # Strictly enforce branch scoping: branch admins can only create users in their branch
+    if not is_superadmin:
+        user.branch_id = current_user.branch_id
+        user.is_superadmin = False
+    elif branch_id is not None:
+        user.branch_id = branch_id
+
     db_user = crud_user.get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     return crud_user.create_user(db=db, user=user)
+
 
 @router.post("/setup-admin", response_model=UserOut, summary="One-time Admin User Setup")
 def setup_initial_admin(setup_data: AdminSetupRequest, db: Session = Depends(get_db)):

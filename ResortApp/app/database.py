@@ -7,14 +7,14 @@ import os
 # Load .env file from the parent directory (ResortApp/.env)
 env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
-    load_dotenv(dotenv_path=env_path, override=True)
+    load_dotenv(dotenv_path=env_path, override=False)
     print(f"Loaded .env from: {env_path.absolute()}")
 else:
     print(f"Warning: .env file not found at {env_path.absolute()}")
 
 # Fallback: also try loading from current directory
 if not os.getenv("DATABASE_URL"):
-    load_dotenv(override=True)
+    load_dotenv(override=False)
 
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 if SQLALCHEMY_DATABASE_URL:

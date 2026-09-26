@@ -60,7 +60,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/zeebulllogo.png"
+  image_path: "assets/stayonelogo.png"
   min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the
@@ -69,7 +69,7 @@ flutter_launcher_icons:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
-    - assets/zeebulllogo.png
+    - assets/stayonelogo.png
     - assets/images/
 
   # The following line ensures that the Material Icons font is

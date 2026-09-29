@@ -127,12 +127,12 @@ def get_current_user(
                 detail="User account has been deactivated."
             )
 
-        # In-memory check: Verify tenant workspace is active
+        # In-memory check: Verify tenant workspace is active & approved
         if user.tenant and not getattr(user, 'is_superadmin', False):
-            if not user.tenant.is_active:
+            if user.tenant.subscription_status == "pending_approval" or not user.tenant.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"This property workspace '{user.tenant.name}' has been disabled by platform administration."
+                    detail=f"This property workspace '{user.tenant.name}' is pending approval / activation by Super Admin."
                 )
 
         # In-memory check: Verify assigned branch and its parent tenant are active
@@ -141,12 +141,12 @@ def get_current_user(
             if not user_branch or not user_branch.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied: Branch '{user_branch.name if user_branch else user.branch_id}' has been disabled by platform administration."
+                    detail=f"Access denied: Branch '{user_branch.name if user_branch else user.branch_id}' is pending activation by Super Admin."
                 )
-            if user_branch.tenant and not user_branch.tenant.is_active:
+            if user_branch.tenant and (user_branch.tenant.subscription_status == "pending_approval" or not user_branch.tenant.is_active):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied: Property workspace '{user_branch.tenant.name}' has been disabled by platform administration."
+                    detail=f"Access denied: Property workspace '{user_branch.tenant.name}' is pending approval / activation by Super Admin."
                 )
 
         # Store user info in request state for logging and scoping

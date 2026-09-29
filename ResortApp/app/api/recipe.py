@@ -109,14 +109,16 @@ def get_recipes(
     food_item_id: Optional[int] = Query(None, description="Filter by food item ID"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    branch_id: int = Depends(get_branch_id)
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
     """Get all recipes, optionally filtered by food item"""
     try:
-        query = db.query(Recipe).filter(Recipe.branch_id == branch_id).options(
+        query = db.query(Recipe).options(
             joinedload(Recipe.food_item),
             joinedload(Recipe.ingredients).joinedload(RecipeIngredient.inventory_item)
         )
+        if branch_id is not None:
+            query = query.filter(Recipe.branch_id == branch_id)
         
         if food_item_id:
             query = query.filter(Recipe.food_item_id == food_item_id)

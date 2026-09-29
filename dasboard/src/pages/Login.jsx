@@ -3,18 +3,20 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import stayoneLogo from "../assets/stayonelogo.png";
 import { jwtDecode } from "jwt-decode";
-import { Mail, Lock, ArrowRight, Loader2, Sparkles, Building2, ShieldCheck } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, Sparkles, Building2, ShieldCheck, Clock, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
     try {
       const response = await api.post("/auth/login", { email, password });
       if (response.data && response.data.access_token) {
@@ -67,16 +69,23 @@ export default function LoginPage() {
           navigate("/dashboard", { replace: true });
         }
       } else {
-        alert("Login failed: No token received from server.");
+        setErrorMessage("Login failed: No authorization token received from server.");
       }
     } catch (err) {
       console.error("Login error:", err);
-      const errorMessage = err.response?.data?.detail || err.message || "Login failed. Please check your credentials.";
-      alert(errorMessage);
+      const detail = err.response?.data?.detail || err.message || "Login failed. Please check your credentials.";
+      const msg = typeof detail === "string" ? detail : JSON.stringify(detail);
+      setErrorMessage(msg);
     } finally {
       setLoading(false);
     }
   };
+
+  const isPendingApprovalError = errorMessage && (
+    errorMessage.toLowerCase().includes("pending approval") || 
+    errorMessage.toLowerCase().includes("pending activation") ||
+    errorMessage.toLowerCase().includes("super admin accepts")
+  );
 
   return (
     <div className="min-h-screen w-full flex bg-[#0f172a] font-sans overflow-hidden">
@@ -110,6 +119,42 @@ export default function LoginPage() {
               Enter your credentials to access the portal
             </p>
           </div>
+
+          {/* Error / Pending Approval Notification Banner */}
+          {errorMessage && (
+            <div className={`p-4 rounded-2xl text-xs flex items-start gap-3 mb-6 transition-all ${
+              isPendingApprovalError
+                ? "bg-amber-50 border-2 border-amber-300 text-amber-900 shadow-sm"
+                : "bg-rose-50 border border-rose-200 text-rose-800"
+            }`}>
+              {isPendingApprovalError ? (
+                <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              )}
+              <div className="space-y-1.5 flex-1">
+                <p className="font-bold text-sm leading-tight">
+                  {isPendingApprovalError ? "Property Pending Approval" : "Authentication Failed"}
+                </p>
+                <p className="leading-relaxed font-medium">{errorMessage}</p>
+                {isPendingApprovalError && (
+                  <div className="pt-2 mt-2 border-t border-amber-200/70 flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold text-amber-900">
+                      ⚡ Pay at Teqmates &amp; share screenshot for instant activation within minutes!
+                    </span>
+                    <a
+                      href="https://api.whatsapp.com/send?phone=919876543210&text=Hi%20Teqmates%2C%20I%20have%20registered%20my%20property%20and%20need%20it%20activated."
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 underline inline-flex items-center gap-1"
+                    >
+                      Share Screenshot on WhatsApp (+91 98765 43210) &rarr;
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Form Section */}
           <form onSubmit={handleLogin} className="space-y-6">

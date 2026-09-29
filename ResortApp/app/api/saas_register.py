@@ -45,6 +45,9 @@ class SaaSPlanResponse(BaseModel):
     max_branches: int
     max_rooms: int
     max_staff_users: int
+    description: Optional[str] = None
+    badge: Optional[str] = None
+    is_active: Optional[bool] = True
     features: List[str]
 
 class SaaSUserRegisterRequest(BaseModel):
@@ -122,18 +125,22 @@ def check_slug(slug: str, db: Session = Depends(get_db)):
 
 @router.get("/plans", response_model=List[SaaSPlanResponse])
 def list_plans(db: Session = Depends(get_db)):
-    """List all available SaaS subscription plans"""
-    plans = db.query(SaaSPlan).filter(SaaSPlan.is_active == True).order_by(SaaSPlan.price_monthly.asc()).all()
+    code_order = {"starter": 1, "growth": 2, "enterprise": 3, "trial": 4}
+    plans = db.query(SaaSPlan).filter(SaaSPlan.is_active == True).all()
+    plans = sorted(plans, key=lambda p: code_order.get(p.code, 99))
     return [
         SaaSPlanResponse(
             id=p.id,
             name=p.name,
             code=p.code,
-            price_monthly=p.price_monthly,
-            price_yearly=p.price_yearly,
-            max_branches=p.max_branches,
-            max_rooms=p.max_rooms,
-            max_staff_users=p.max_staff_users,
+            price_monthly=p.price_monthly or 0.0,
+            price_yearly=p.price_yearly or 0.0,
+            max_branches=p.max_branches or 1,
+            max_rooms=p.max_rooms or 15,
+            max_staff_users=p.max_staff_users or 5,
+            description=p.description or "",
+            badge=p.badge or "",
+            is_active=bool(p.is_active),
             features=p.features_list
         ) for p in plans
     ]
@@ -200,20 +207,20 @@ def register_saas_business(req: SaaSUserRegisterRequest, db: Session = Depends(g
             monthly_amount=monthly_amt,
             payment_status="unpaid",
             next_billing_date=now + timedelta(days=30),
-            is_active=True
+            is_active=False # Inactive until accepted by Super Admin
         )
         db.add(tenant)
         db.flush() # get tenant.id
 
-        # 4. Validate and Sanitize Compulsory Aiosell Hotel Code
+        # 4. Validate and Sanitize Compulsory Hotel Code
         branch_code = re.sub(r'[^a-zA-Z0-9_-]', '', req.branch_code.strip()).upper()
         if not branch_code:
-            raise HTTPException(status_code=400, detail="Aiosell Hotel Code is compulsory. Please enter your hotel code.")
+            raise HTTPException(status_code=400, detail="Hotel Code / Property Code is compulsory. Please enter your code.")
 
         if db.query(Branch).filter(Branch.code == branch_code).first():
             raise HTTPException(
                 status_code=400, 
-                detail=f"Aiosell Hotel Code '{branch_code}' is already registered with another property. Please enter your unique Aiosell code."
+                detail=f"Hotel Code '{branch_code}' is already registered with another property. Please enter your unique hotel code."
             )
 
         # 5. Create Default Branch with Aiosell Hotel/Branch Code & Details
@@ -231,7 +238,7 @@ def register_saas_business(req: SaaSUserRegisterRequest, db: Session = Depends(g
             twitter=req.twitter.strip() if req.twitter else None,
             linkedin=req.linkedin.strip() if req.linkedin else None,
             image_url=req.image_url.strip() if req.image_url else None,
-            is_active=True
+            is_active=False # Inactive until accepted by Super Admin
         )
         db.add(branch)
         db.flush() # get branch.id
@@ -266,25 +273,11 @@ def register_saas_business(req: SaaSUserRegisterRequest, db: Session = Depends(g
         db.refresh(branch)
         db.refresh(user)
 
-        # 8. Generate JWT Access Token for Immediate Login
-        token_data = {
-            "user_id": user.id,
-            "tenant_id": tenant.id,
-            "tenant_slug": tenant.slug,
-            "role": owner_role.name,
-            "branch_id": branch.id,
-            "is_superadmin": False,
-            "permissions": DEFAULT_OWNER_PERMISSIONS
-        }
-        access_token = create_access_token(
-            data=token_data,
-            expires_delta=timedelta(hours=ACCESS_TOKEN_EXPIRE_MINUTES)
-        )
-
+        # Access token is NOT generated until Super Admin accepts/approves the property
         return SaaSRegisterResponse(
             success=True,
-            message="Registration submitted! Once platform admin accepts your property, full app features will be unlocked.",
-            access_token=access_token,
+            message="Registration submitted successfully! Your property is awaiting Super Admin approval and payment confirmation before activation.",
+            access_token=None,
             tenant={
                 "id": tenant.id,
                 "name": tenant.name,
@@ -342,14 +335,14 @@ def get_tenant_profile(
         "subscription_status": tenant.subscription_status,
         "is_approved": is_approved,
         "payment_status": tenant.payment_status or "unpaid",
-        "monthly_amount": tenant.monthly_amount or (tenant.plan.price_monthly if tenant.plan else 2500.0),
+        "monthly_amount": getattr(tenant, 'monthly_amount', None) or (tenant.plan.price_monthly if tenant.plan else 2500.0),
         "last_billed_at": str(tenant.last_billed_at) if tenant.last_billed_at else None,
         "next_billing_date": str(tenant.next_billing_date) if tenant.next_billing_date else None,
         "branch_code": primary_branch.code if primary_branch else None,
         "plan": {
             "name": tenant.plan.name if tenant.plan else "Starter",
             "code": tenant.plan.code if tenant.plan else "starter",
-            "price_monthly": tenant.monthly_amount or (tenant.plan.price_monthly if tenant.plan else 2500.0),
+            "price_monthly": getattr(tenant, 'monthly_amount', None) or (tenant.plan.price_monthly if tenant.plan else 2500.0),
             "max_branches": tenant.plan.max_branches if tenant.plan else 1,
             "max_rooms": tenant.plan.max_rooms if tenant.plan else 20,
             "max_staff_users": tenant.plan.max_staff_users if tenant.plan else 10,
@@ -420,9 +413,25 @@ def list_all_tenants_for_admin(db: Session = Depends(get_db)):
     )
 
     result = []
+    now = datetime.now(timezone.utc)
     for t in tenants:
         primary_branch = t.branches[0] if t.branches else None
         owner_user = next((u for u in t.users if not getattr(u, 'is_superadmin', False)), (t.users[0] if t.users else None))
+        
+        next_date = t.next_billing_date
+        days_until_due = None
+        is_overdue = False
+        is_due_soon = False
+        expiry_date = None
+        if next_date:
+            if next_date.tzinfo is None:
+                next_date = next_date.replace(tzinfo=timezone.utc)
+            diff_seconds = (next_date - now).total_seconds()
+            days_until_due = int(round(diff_seconds / 86400.0))
+            is_overdue = days_until_due < 0
+            is_due_soon = 0 <= days_until_due <= 7
+            expiry_date = next_date.strftime("%d %b %Y")
+
         result.append({
             "id": t.id,
             "name": t.name,
@@ -439,6 +448,15 @@ def list_all_tenants_for_admin(db: Session = Depends(get_db)):
             "plan_code": t.plan.code if t.plan else "starter",
             "monthly_amount": t.monthly_amount or (t.plan.price_monthly if t.plan else 2500.0),
             "payment_status": t.payment_status or "unpaid",
+            "payment_ref": getattr(t, 'payment_ref', None),
+            "payment_method": getattr(t, 'payment_method', None),
+            "payment_raised_at": str(t.payment_raised_at) if getattr(t, 'payment_raised_at', None) else None,
+            "next_billing_date": str(t.next_billing_date.strftime("%Y-%m-%d")) if t.next_billing_date else None,
+            "expiry_date": expiry_date,
+            "days_until_due": days_until_due,
+            "is_due_soon": is_due_soon,
+            "is_overdue": is_overdue,
+            "last_billed_at": str(t.last_billed_at) if t.last_billed_at else None,
             "branch_code": primary_branch.code if primary_branch else "N/A",
             "branch_id": primary_branch.id if primary_branch else None,
             "room_count": room_counts.get(t.id, 0),
@@ -492,16 +510,27 @@ def approve_tenant(
     tenant.subscription_status = "active"
     tenant.is_active = True
     tenant.approved_at = datetime.now(timezone.utc)
+
+    # Activate all branches of this tenant
+    branches = db.query(Branch).filter(Branch.tenant_id == tenant.id).all()
+    for b in branches:
+        b.is_active = True
+
+    # Activate all users of this tenant
+    users = db.query(User).filter(User.tenant_id == tenant.id).all()
+    for u in users:
+        u.is_active = True
+
     db.commit()
     db.refresh(tenant)
     
-    msg = f"Property '{tenant.name}' approved successfully!"
+    msg = f"Property '{tenant.name}' approved and activated! Property admin can now log in."
     if assigned_code:
         msg += f" Hotel Code set to '{assigned_code}'."
     return {
         "success": True, 
         "message": msg,
-        "tenant_id": tenant.id,
+        "tenant_id": tenant.id, 
         "subscription_status": tenant.subscription_status,
         "is_active": tenant.is_active,
         "branch_code": assigned_code
@@ -557,11 +586,19 @@ def toggle_tenant_status(
         raise HTTPException(status_code=404, detail="Tenant property not found")
         
     tenant.is_active = not bool(tenant.is_active)
+    if tenant.is_active and tenant.subscription_status == "pending_approval":
+        tenant.subscription_status = "active"
+        tenant.approved_at = datetime.now(timezone.utc)
     
     # Synchronize all branches of this tenant
     branches = db.query(Branch).filter(Branch.tenant_id == tenant.id).all()
     for b in branches:
         b.is_active = tenant.is_active
+        
+    # Synchronize all users of this tenant
+    users = db.query(User).filter(User.tenant_id == tenant.id).all()
+    for u in users:
+        u.is_active = tenant.is_active
         
     db.commit()
     db.refresh(tenant)
@@ -574,11 +611,179 @@ def toggle_tenant_status(
     }
 
 
+class AcceptPaymentRequest(BaseModel):
+    payment_status: Optional[str] = "paid" # "paid", "unpaid", "overdue"
+    payment_method: Optional[str] = "UPI (Teqmates)"
+    transaction_ref: Optional[str] = None
+    activate_property: Optional[bool] = True
+
+@router.post("/admin/accept-payment/{tenant_id}")
+def accept_tenant_payment(
+    tenant_id: int,
+    req: Optional[AcceptPaymentRequest] = None,
+    db: Session = Depends(get_db)
+):
+    """Allow SuperAdmin to accept, verify, or toggle payment status for a tenant property"""
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant property not found")
+        
+    status = (req.payment_status if req and req.payment_status else "paid").lower()
+    tenant.payment_status = status
+    now = datetime.now(timezone.utc)
+    
+    if status == "paid":
+        tenant.last_billed_at = now
+        tenant.next_billing_date = now + timedelta(days=30)
+        
+        # When payment is accepted, immediately activate the property workspace
+        if req is None or req.activate_property:
+            tenant.subscription_status = "active"
+            tenant.is_active = True
+            tenant.approved_at = now
+            
+            # Ensure all branches are active
+            branches = db.query(Branch).filter(Branch.tenant_id == tenant.id).all()
+            for b in branches:
+                b.is_active = True
+                
+            # Ensure all users are active
+            users = db.query(User).filter(User.tenant_id == tenant.id).all()
+            for u in users:
+                u.is_active = True
+    elif status == "unpaid":
+        tenant.last_billed_at = None
+        
+    db.commit()
+    db.refresh(tenant)
+    
+    action_text = "accepted & property activated" if status == "paid" else f"updated to {status}"
+    ref_info = f" (Ref: {req.transaction_ref})" if req and req.transaction_ref else ""
+    return {
+        "success": True,
+        "message": f"Payment for '{tenant.name}' has been {action_text}{ref_info}! Property is now active.",
+        "tenant_id": tenant.id,
+        "payment_status": tenant.payment_status,
+        "subscription_status": tenant.subscription_status
+    }
+
+
+# --- SuperAdmin SaaS Plan Management ---
+
+class PlanUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    price_monthly: Optional[float] = None
+    price_yearly: Optional[float] = None
+    max_rooms: Optional[int] = None
+    max_branches: Optional[int] = None
+    max_staff_users: Optional[int] = None
+    description: Optional[str] = None
+    badge: Optional[str] = None
+    features: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+    update_existing_tenants: Optional[bool] = False
+
+@router.get("/admin/plans")
+def list_all_plans_for_admin(db: Session = Depends(get_db)):
+    code_order = {"starter": 1, "growth": 2, "enterprise": 3, "trial": 4}
+    plans = db.query(SaaSPlan).all()
+    plans = sorted(plans, key=lambda p: code_order.get(p.code, 99))
+    result = []
+    for p in plans:
+        subscriber_count = db.query(Tenant).filter(Tenant.plan_id == p.id).count()
+        result.append({
+            "id": p.id,
+            "name": p.name,
+            "code": p.code,
+            "price_monthly": p.price_monthly or 0.0,
+            "price_yearly": p.price_yearly or 0.0,
+            "max_branches": p.max_branches or 1,
+            "max_rooms": p.max_rooms or 15,
+            "max_staff_users": p.max_staff_users or 5,
+            "description": p.description or "",
+            "badge": p.badge or "",
+            "is_active": bool(p.is_active),
+            "features": p.features_list,
+            "subscriber_count": subscriber_count
+        })
+    return result
+
+
+@router.put("/admin/plans/{plan_id}")
+def update_plan_for_admin(
+    plan_id: int,
+    req: PlanUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """Allow SuperAdmin to edit any SaaS plan (name, pricing, rooms, features, badges, description)"""
+    plan = db.query(SaaSPlan).filter(SaaSPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="SaaS Plan not found")
+
+    if req.name is not None and req.name.strip():
+        plan.name = req.name.strip()
+    if req.price_monthly is not None:
+        plan.price_monthly = float(req.price_monthly)
+    if req.price_yearly is not None:
+        plan.price_yearly = float(req.price_yearly)
+    if req.max_rooms is not None:
+        plan.max_rooms = int(req.max_rooms)
+    if req.max_branches is not None:
+        plan.max_branches = int(req.max_branches)
+    if req.max_staff_users is not None:
+        plan.max_staff_users = int(req.max_staff_users)
+    if req.description is not None:
+        plan.description = req.description.strip()
+    if req.badge is not None:
+        plan.badge = req.badge.strip()
+    if req.is_active is not None:
+        plan.is_active = bool(req.is_active)
+    if req.features is not None:
+        clean_features = [f.strip() for f in req.features if f and f.strip()]
+        plan.features = json.dumps(clean_features)
+
+    # If requested, update monthly_amount for tenants currently on this plan
+    if req.update_existing_tenants and req.price_monthly is not None:
+        tenants = db.query(Tenant).filter(Tenant.plan_id == plan.id).all()
+        for t in tenants:
+            t.monthly_amount = float(req.price_monthly)
+
+    db.commit()
+    db.refresh(plan)
+
+    return {
+        "success": True,
+        "message": f"Plan '{plan.name}' has been updated successfully!",
+        "plan": {
+            "id": plan.id,
+            "name": plan.name,
+            "code": plan.code,
+            "price_monthly": plan.price_monthly,
+            "price_yearly": plan.price_yearly,
+            "max_branches": plan.max_branches,
+            "max_rooms": plan.max_rooms,
+            "max_staff_users": plan.max_staff_users,
+            "description": plan.description,
+            "badge": plan.badge,
+            "is_active": plan.is_active,
+            "features": plan.features_list
+        }
+    }
+
+
 # --- Property Billing & Payment Endpoints (Day 1 & Monthly) ---
 
 class PayBillRequest(BaseModel):
     payment_method: Optional[str] = "UPI / Card"
     transaction_ref: Optional[str] = None
+
+class RaisePaymentRequest(BaseModel):
+    tenant_id: Optional[int] = None
+    slug: Optional[str] = None
+    branch_code: Optional[str] = None
+    payment_method: Optional[str] = "UPI (Teqmates)"
+    transaction_ref: str
+    notes: Optional[str] = None
 
 @router.get("/billing")
 def get_tenant_billing(
@@ -588,8 +793,22 @@ def get_tenant_billing(
     """Fetch property billing, monthly subscription rates, and payment options"""
     primary_branch = db.query(Branch).filter(Branch.tenant_id == tenant.id).first()
     monthly_amt = tenant.monthly_amount or (tenant.plan.price_monthly if tenant.plan else 2500.0)
-    next_date = tenant.next_billing_date or (datetime.now(timezone.utc) + timedelta(days=30))
-    
+    now = datetime.now(timezone.utc)
+    next_date = tenant.next_billing_date or (now + timedelta(days=30))
+    if next_date.tzinfo is None:
+        next_date = next_date.replace(tzinfo=timezone.utc)
+
+    diff_seconds = (next_date - now).total_seconds()
+    days_until_due = int(round(diff_seconds / 86400.0))
+    is_overdue = days_until_due < 0
+    is_due_soon = 0 <= days_until_due <= 7
+
+    current_status = tenant.payment_status or "unpaid"
+    # If the due date / expiry date has passed and previous month was paid,
+    # the new monthly cycle is now due!
+    if is_overdue and current_status == "paid":
+        current_status = "overdue"
+
     return {
         "tenant_id": tenant.id,
         "business_name": tenant.name,
@@ -602,11 +821,59 @@ def get_tenant_billing(
         },
         "branch_code": primary_branch.code if primary_branch else "N/A",
         "monthly_amount": monthly_amt,
-        "payment_status": tenant.payment_status or "unpaid",
+        "payment_status": current_status,
+        "payment_ref": getattr(tenant, 'payment_ref', None),
+        "payment_method": getattr(tenant, 'payment_method', None),
+        "payment_raised_at": str(tenant.payment_raised_at) if getattr(tenant, 'payment_raised_at', None) else None,
         "billing_cycle": tenant.billing_cycle or "monthly",
         "last_billed_at": str(tenant.last_billed_at) if tenant.last_billed_at else None,
         "next_billing_date": str(next_date),
+        "due_date": next_date.strftime("%Y-%m-%d"),
+        "expiry_date": next_date.strftime("%d %b %Y"),
+        "days_until_due": days_until_due,
+        "is_due_soon": is_due_soon,
+        "is_overdue": is_overdue,
         "currency": tenant.currency or "INR"
+    }
+
+
+@router.post("/raise-payment")
+def raise_property_payment(
+    req: RaisePaymentRequest,
+    db: Session = Depends(get_db)
+):
+    """Allows a property (pending approval or active) to raise payment with UTR / reference for Super Admin acceptance"""
+    if not req.transaction_ref or not req.transaction_ref.strip():
+        raise HTTPException(status_code=400, detail="Transaction reference / UTR number is required")
+        
+    tenant = None
+    if req.tenant_id:
+        tenant = db.query(Tenant).filter(Tenant.id == req.tenant_id).first()
+    elif req.slug:
+        tenant = db.query(Tenant).filter(Tenant.slug == req.slug.strip().lower()).first()
+    elif req.branch_code:
+        branch = db.query(Branch).filter(Branch.code == req.branch_code.strip().upper()).first()
+        if branch and branch.tenant_id:
+            tenant = db.query(Tenant).filter(Tenant.id == branch.tenant_id).first()
+            
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Property not found")
+        
+    now = datetime.now(timezone.utc)
+    tenant.payment_status = "payment_raised"
+    tenant.payment_ref = req.transaction_ref.strip().upper()
+    tenant.payment_method = req.payment_method or "UPI (Teqmates)"
+    tenant.payment_raised_at = now
+    
+    db.commit()
+    db.refresh(tenant)
+    return {
+        "success": True,
+        "message": f"Payment of {tenant.currency} {tenant.monthly_amount:,.2f} raised with UTR '{tenant.payment_ref}'! Super Admin can now verify and accept the payment.",
+        "tenant_id": tenant.id,
+        "payment_status": tenant.payment_status,
+        "payment_ref": tenant.payment_ref,
+        "payment_raised_at": str(tenant.payment_raised_at)
     }
 
 
@@ -616,17 +883,20 @@ def pay_monthly_bill(
     tenant: Tenant = Depends(get_current_tenant),
     db: Session = Depends(get_db)
 ):
-    """Process property bill payment on day 1 or monthly recurring"""
+    """Raise monthly bill payment from property for Super Admin verification & acceptance"""
     now = datetime.now(timezone.utc)
-    tenant.last_billed_at = now
-    tenant.next_billing_date = now + timedelta(days=30)
-    tenant.payment_status = "paid"
+    tenant.payment_status = "payment_raised"
+    tenant.payment_ref = req.transaction_ref.strip().upper() if req and req.transaction_ref else f"TXN-{int(now.timestamp())}"
+    tenant.payment_method = req.payment_method if req and req.payment_method else "UPI (Teqmates)"
+    tenant.payment_raised_at = now
     
     db.commit()
     db.refresh(tenant)
     return {
         "success": True,
-        "message": f"Payment of {tenant.currency} {tenant.monthly_amount:,.2f} completed successfully for {tenant.name}!",
+        "message": f"Payment raised with reference '{tenant.payment_ref}'! Super Admin will review and accept your payment.",
         "payment_status": tenant.payment_status,
+        "payment_ref": tenant.payment_ref,
+        "payment_raised_at": str(tenant.payment_raised_at),
         "next_billing_date": str(tenant.next_billing_date)
     }

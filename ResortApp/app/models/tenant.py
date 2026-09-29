@@ -15,7 +15,9 @@ class SaaSPlan(Base):
     max_branches = Column(Integer, default=1)
     max_rooms = Column(Integer, default=15)
     max_staff_users = Column(Integer, default=5)
-    features = Column(Text, nullable=True) # JSON list of enabled feature codes
+    description = Column(String, nullable=True) # e.g. "Ideal for boutique resorts and homestays"
+    badge = Column(String, nullable=True) # e.g. "Most Popular"
+    features = Column(Text, nullable=True) # JSON list of enabled feature codes or display bullet points
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -53,8 +55,10 @@ class Tenant(Base):
     last_billed_at = Column(DateTime, nullable=True)
     next_billing_date = Column(DateTime, nullable=True)
     billing_cycle = Column(String, default="monthly")
-    monthly_amount = Column(Float, default=0.0)
-    payment_status = Column(String, default="unpaid") # unpaid, paid, overdue
+    payment_status = Column(String, default="unpaid") # unpaid, payment_raised, paid, overdue
+    payment_ref = Column(String, nullable=True) # UTR or transaction ID
+    payment_method = Column(String, nullable=True) # payment method used
+    payment_raised_at = Column(DateTime, nullable=True)
     approved_at = Column(DateTime, nullable=True)
     approved_by = Column(Integer, nullable=True)
     

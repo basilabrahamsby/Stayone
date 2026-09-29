@@ -128,6 +128,9 @@ async def update_branch(
     linkedin: Optional[str] = Form(None),
     location: Optional[str] = Form(None),
     is_active: Optional[bool] = Form(None),
+    password: Optional[str] = Form(None),
+    payment_status: Optional[str] = Form(None),
+    monthly_amount: Optional[float] = Form(None),
     image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     admin: User = Depends(verify_superadmin) # Only superadmin can update branches
@@ -164,12 +167,68 @@ async def update_branch(
     # Keep parent tenant profile in sync
     if updated.tenant_id:
         from app.models.tenant import Tenant
+        from datetime import datetime, timezone, timedelta
         tenant = db.query(Tenant).filter(Tenant.id == updated.tenant_id).first()
         if tenant:
             if name: tenant.name = name
             if phone: tenant.contact_phone = phone
             if email: tenant.contact_email = email
+            if payment_status:
+                tenant.payment_status = payment_status.strip().lower()
+                if tenant.payment_status == "paid":
+                    tenant.last_billed_at = datetime.now(timezone.utc)
+                    tenant.next_billing_date = datetime.now(timezone.utc) + timedelta(days=30)
+                    tenant.subscription_status = "active"
+                    tenant.is_active = True
+                    updated.is_active = True
+            if monthly_amount is not None:
+                tenant.monthly_amount = monthly_amount
             db.commit()
+
+    # Update property admin user credentials if password or email is provided
+    from app.models.user import User as UserModel
+    from app.utils.auth import get_password_hash
+    prop_user = None
+    if updated.tenant_id:
+        prop_user = db.query(UserModel).filter(UserModel.tenant_id == updated.tenant_id).first()
+    if not prop_user and email:
+        prop_user = db.query(UserModel).filter(UserModel.email == email).first()
+    if not prop_user:
+        prop_user = db.query(UserModel).filter(UserModel.branch_id == branch_id).first()
+
+    if prop_user and payment_status and payment_status.strip().lower() == "paid":
+        prop_user.is_active = True
+        db.commit()
+
+    if password and password.strip():
+        new_pwd = password.strip()
+        if len(new_pwd) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+        if prop_user:
+            prop_user.hashed_password = get_password_hash(new_pwd)
+            db.commit()
+        else:
+            from app.models.user import Role
+            admin_role = db.query(Role).filter(Role.name.ilike("admin%")).first()
+            new_user = UserModel(
+                name=updated.name,
+                email=updated.email or f"{updated.code.lower()}@stayone.com",
+                hashed_password=get_password_hash(new_pwd),
+                is_active=True,
+                role_id=admin_role.id if admin_role else 1,
+                branch_id=branch_id,
+                tenant_id=updated.tenant_id
+            )
+            db.add(new_user)
+            db.commit()
+
+    if email and email.strip() and prop_user:
+        clean_email = email.strip().lower()
+        if prop_user.email != clean_email:
+            conflict = db.query(UserModel).filter(UserModel.email == clean_email, UserModel.id != prop_user.id).first()
+            if not conflict:
+                prop_user.email = clean_email
+                db.commit()
 
     return updated
 

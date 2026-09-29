@@ -24,9 +24,9 @@ def create_category(db: Session, data: InventoryCategoryCreate, branch_id: int):
 
 
 def get_all_categories(db: Session, skip: int = 0, limit: int = 100, active_only: bool = True, branch_id: Optional[int] = None):
-    # Categories are shared master data visible to all branches.
-    # branch_id parameter is accepted for API compatibility but intentionally not used as a filter.
     query = db.query(InventoryCategory)
+    if branch_id is not None:
+        query = query.filter(InventoryCategory.branch_id == branch_id)
     if active_only:
         query = query.filter(InventoryCategory.is_active == True)
     return query.offset(skip).limit(limit).all()
@@ -63,15 +63,12 @@ def create_item(db: Session, data: InventoryItemCreate, branch_id: int):
 
 
 def get_all_items(db: Session, skip: int = 0, limit: int = 100, category_id: Optional[int] = None, active_only: bool = True, is_fixed_asset: Optional[bool] = None, branch_id: Optional[int] = None):
-    """Items are global master data visible to all branches.
-    Stock levels are branch-scoped via LocationStock and per-branch purchases/transactions.
-    branch_id is accepted for API compatibility but not used as a filter here.
-    """
     query = db.query(InventoryItem).options(
         joinedload(InventoryItem.category),
         joinedload(InventoryItem.preferred_vendor)
     )
-    # NOTE: branch_id intentionally NOT applied — items are shared across branches.
+    if branch_id is not None:
+        query = query.filter(InventoryItem.branch_id == branch_id)
     if category_id:
         query = query.filter(InventoryItem.category_id == category_id)
     if active_only:
@@ -2300,13 +2297,15 @@ def get_location_stock(db: Session, location_id: int):
     return result
 
 
-def get_all_recipes(db: Session, skip: int = 0, limit: int = 100):
+def get_all_recipes(db: Session, skip: int = 0, limit: int = 100, branch_id: Optional[int] = None):
     """Get all recipes"""
     from app.models.recipe import Recipe, RecipeIngredient
     query = db.query(Recipe).options(
         joinedload(Recipe.food_item),
         selectinload(Recipe.ingredients).joinedload(RecipeIngredient.inventory_item)
     )
+    if branch_id is not None:
+        query = query.filter(Recipe.branch_id == branch_id)
     return query.offset(skip).limit(limit).all()
 
 

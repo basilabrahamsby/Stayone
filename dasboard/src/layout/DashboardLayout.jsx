@@ -32,7 +32,7 @@ import { useBranch } from "../contexts/BranchContext";
 import { Building2, ChevronDown } from "lucide-react";
 import { usePermissions } from "../hooks/usePermissions";
 
-import { CreditCard, AlertCircle } from "lucide-react";
+import { CreditCard, AlertCircle, Copy, Check, MessageSquare, Zap, ArrowUpRight, Clock, Calendar } from "lucide-react";
 import api from "../services/api";
 
 // Define professional, high-end themes with a focus on harmony and readability.
@@ -229,6 +229,7 @@ export default function DashboardLayout({ children }) {
   const [billingInfo, setBillingInfo] = useState(null);
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [payingBill, setPayingBill] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   useEffect(() => {
     const fetchTenantProfile = async () => {
@@ -250,12 +251,24 @@ export default function DashboardLayout({ children }) {
   }, []);
 
   const isPendingApproval = tenantProfile?.subscription_status === "pending_approval";
+  const isOverdue = billingInfo?.is_overdue || (billingInfo?.days_until_due !== undefined && billingInfo.days_until_due < 0);
+  const isDueSoon = billingInfo?.is_due_soon || (billingInfo?.days_until_due !== undefined && billingInfo.days_until_due >= 0 && billingInfo.days_until_due <= 7);
+  const isUnpaid = billingInfo?.payment_status === "unpaid" || billingInfo?.payment_status === "overdue";
+  const isPaymentRaised = billingInfo?.payment_status === "payment_raised";
+  const expiryDateFormatted = billingInfo?.expiry_date || (billingInfo?.next_billing_date ? new Date(billingInfo.next_billing_date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' }) : null);
+  const daysUntilDue = billingInfo?.days_until_due !== undefined ? billingInfo.days_until_due : null;
+
+  // Show due/expiry alert banner automatically at the time of due date or when payment is unpaid/raised
+  const showDueBanner = !isSuper && !isPendingApproval && (isOverdue || isDueSoon || isUnpaid || isPaymentRaised);
 
   const handlePayBill = async () => {
     setPayingBill(true);
     try {
-      await api.post("/saas/pay-bill");
-      alert("✅ Payment recorded! Your billing is now up to date.");
+      await api.post("/saas/pay-bill", {
+        payment_method: "Simulated Quick Pay",
+        transaction_ref: `TXN-${Date.now()}`
+      });
+      alert("✅ Payment raised! Verification is in progress by Super Admin.");
       const res = await api.get("/saas/billing");
       setBillingInfo(res.data);
     } catch (e) {
@@ -280,6 +293,7 @@ export default function DashboardLayout({ children }) {
     { label: "Employee Mgt", icon: <Briefcase size={18} />, to: "/employee-management" },
     { label: "Inventory", icon: <Warehouse size={18} />, to: "/inventory" },
     { label: "Day Audit", icon: <CalendarCheck size={18} />, to: "/day-audit" },
+    { label: "Subscription & Pay", icon: <CreditCard size={18} />, to: "/subscription" },
     { label: "Settings", icon: <Settings size={18} />, to: "/settings" },
     ...(isSuper ? [{ label: "Branch Mgt", icon: <Building2 size={18} />, to: "/branch-management" }] : []),
     { label: "Activity Logs", icon: <Activity size={18} />, to: "/activity-logs" },
@@ -586,81 +600,277 @@ export default function DashboardLayout({ children }) {
             </div>
           )}
 
-          {/* Monthly Bill floating button (always visible for non-superadmin tenants) */}
+          {/* Automatic Payment Due / Expiry Date Banner */}
+          {showDueBanner && (
+            <div className={`mb-5 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border-2 transition-all ${
+              isOverdue
+                ? "bg-gradient-to-r from-rose-50 via-red-50 to-orange-50 border-rose-300 text-rose-950"
+                : isPaymentRaised
+                ? "bg-gradient-to-r from-amber-50 via-indigo-50/40 to-blue-50 border-indigo-200 text-indigo-950"
+                : isDueSoon
+                ? "bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 border-amber-300 text-amber-950"
+                : "bg-gradient-to-r from-amber-50 to-slate-50 border-amber-200 text-amber-950"
+            }`}>
+              <div className="flex items-start gap-3.5">
+                <div className={`p-2.5 rounded-xl shrink-0 ${
+                  isOverdue ? "bg-rose-500 text-white animate-pulse" : isPaymentRaised ? "bg-indigo-600 text-white" : "bg-amber-500 text-white"
+                }`}>
+                  {isOverdue ? <AlertCircle size={22} /> : isPaymentRaised ? <Zap size={22} /> : <Clock size={22} />}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-extrabold text-sm sm:text-base leading-tight">
+                      {isOverdue
+                        ? `🚨 Subscription Expired on ${expiryDateFormatted}`
+                        : isPaymentRaised
+                        ? "⚡ Payment Verification in Progress"
+                        : isDueSoon
+                        ? `⏳ Subscription Due ${daysUntilDue === 0 ? "TODAY" : `in ${daysUntilDue} day${daysUntilDue > 1 ? 's' : ''}`} (Expiry: ${expiryDateFormatted})`
+                        : `⚠️ Monthly Subscription Payment Due (Expiry: ${expiryDateFormatted || 'Due Soon'})`}
+                    </h4>
+                    <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                      isOverdue ? "bg-rose-200 text-rose-900 border border-rose-300" : isPaymentRaised ? "bg-indigo-200 text-indigo-900" : "bg-amber-200 text-amber-900 border border-amber-300"
+                    }`}>
+                      {isOverdue ? "Immediate Action Required" : isPaymentRaised ? "Awaiting Acceptance" : daysUntilDue === 0 ? "Due Today" : "Due Soon"}
+                    </span>
+                  </div>
+                  <p className="text-xs opacity-90 leading-relaxed max-w-2xl">
+                    {isOverdue
+                      ? `Your property subscription ended on ${expiryDateFormatted}. Please pay your monthly renewal of ₹${(billingInfo?.monthly_amount || 0).toLocaleString()} to keep your property workspace active.`
+                      : isPaymentRaised
+                      ? `Payment of ₹${(billingInfo?.monthly_amount || 0).toLocaleString()} (Ref: ${billingInfo?.payment_ref || "Submitted"}) has been raised and is awaiting Super Admin verification.`
+                      : `Your property subscription expires on ${expiryDateFormatted}. Pay your monthly renewal of ₹${(billingInfo?.monthly_amount || 0).toLocaleString()} to ensure continuous, uninterrupted access.`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                <button
+                  onClick={() => setShowBillingModal(true)}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 ${
+                    isOverdue
+                      ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200"
+                      : isPaymentRaised
+                      ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200"
+                      : "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200"
+                  }`}
+                >
+                  <CreditCard size={14} />
+                  <span>{isPaymentRaised ? "View Payment Details" : `Pay Now (₹${(billingInfo?.monthly_amount || 0).toLocaleString()})`}</span>
+                </button>
+                <Link
+                  to="/subscription"
+                  className="px-3 py-2 bg-white/90 hover:bg-white text-gray-700 border border-gray-200 text-xs font-semibold rounded-xl transition-colors shadow-xs"
+                >
+                  Details &rarr;
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Monthly Bill & Expiry bar (always visible for non-superadmin tenants) */}
           {tenantProfile && !isSuper && (
-            <div className="flex justify-end mb-2">
-              <button
-                onClick={() => setShowBillingModal(true)}
+            <div className="flex justify-end mb-2 gap-2 flex-wrap items-center">
+              {expiryDateFormatted && (
+                <div className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 shadow-2xs ${
+                  isOverdue
+                    ? "bg-rose-50 border-rose-300 text-rose-700 animate-pulse"
+                    : isDueSoon
+                    ? "bg-amber-50 border-amber-300 text-amber-800"
+                    : "bg-slate-50 border-slate-200 text-slate-700"
+                }`}>
+                  <Calendar size={13} className={isOverdue ? "text-rose-500" : isDueSoon ? "text-amber-500" : "text-slate-400"} />
+                  <span>Expiry: {expiryDateFormatted}</span>
+                  {daysUntilDue !== null && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                      isOverdue ? "bg-rose-200 text-rose-900" : isDueSoon ? "bg-amber-200 text-amber-900" : "bg-slate-200 text-slate-800"
+                    }`}>
+                      {isOverdue ? `${Math.abs(daysUntilDue)}d overdue` : daysUntilDue === 0 ? "Due Today" : `${daysUntilDue}d left`}
+                    </span>
+                  )}
+                </div>
+              )}
+              <Link
+                to="/subscription"
                 className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl shadow-sm transition-all hover:opacity-80"
                 style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--accent-text)', border: '1px solid var(--border-color)' }}
               >
                 <CreditCard size={14} />
-                Monthly Bill
-                {billingInfo?.payment_status === 'unpaid' && (
+                Monthly Subscription &amp; Payments
+                {(billingInfo?.payment_status === 'unpaid' || isOverdue) && (
                   <span className="ml-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 )}
+              </Link>
+              <button
+                onClick={() => setShowBillingModal(true)}
+                className="p-2 text-xs font-semibold rounded-xl shadow-sm transition-all bg-white hover:bg-gray-50 border border-gray-200 text-gray-600"
+                title="Quick Billing Summary &amp; Pay"
+              >
+                <Zap size={14} className="text-amber-500" />
               </button>
             </div>
           )}
 
           {/* Billing Modal */}
           {showBillingModal && (
-            <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-7">
-                <div className="flex items-center justify-between mb-5">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="text-indigo-600" size={22} />
-                    <h2 className="text-xl font-bold text-gray-900">Property Billing</h2>
+            <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6 md:p-7 border border-gray-100">
+                <div className="flex items-center justify-between mb-5 pb-3 border-b border-gray-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                      <CreditCard size={20} />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900 leading-tight">Property Billing</h2>
+                      <p className="text-xs text-gray-500">Subscription &amp; activation details</p>
+                    </div>
                   </div>
-                  <button onClick={() => setShowBillingModal(false)} className="text-gray-400 hover:text-gray-700 text-xl font-bold">&times;</button>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      to="/subscription"
+                      onClick={() => setShowBillingModal(false)}
+                      className="px-2.5 py-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <span>Full Page</span>
+                      <ArrowUpRight size={13} />
+                    </Link>
+                    <button 
+                      onClick={() => setShowBillingModal(false)} 
+                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-800 flex items-center justify-center text-lg font-bold transition-colors"
+                    >
+                      &times;
+                    </button>
+                  </div>
                 </div>
 
                 {billingInfo ? (
                   <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Plan</span>
-                        <span className="font-semibold text-gray-900 capitalize">{billingInfo.plan || tenantProfile?.plan_code || 'starter'}</span>
+                    {/* Current Plan Overview */}
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500 font-medium">Plan</span>
+                        <span className="font-bold text-gray-900 capitalize">
+                          {(typeof billingInfo.plan === 'object' ? billingInfo.plan?.name || billingInfo.plan?.code : billingInfo.plan) || tenantProfile?.plan_code || (typeof tenantProfile?.plan === 'object' ? tenantProfile.plan?.name : tenantProfile?.plan) || 'starter'}
+                        </span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Aiosell Branch Code</span>
-                        <span className="font-mono font-bold text-indigo-700">{billingInfo.branch_code || '—'}</span>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500 font-medium">Property Code</span>
+                        <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                          {billingInfo.branch_code || '—'}
+                        </span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Monthly Fee</span>
-                        <span className="font-bold text-gray-900">₹{billingInfo.monthly_amount?.toLocaleString() || '—'}</span>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500 font-medium">Monthly Fee</span>
+                        <span className="font-extrabold text-gray-900 text-base">₹{billingInfo.monthly_amount?.toLocaleString() || '0'}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Status</span>
-                        <span className={`font-bold ${billingInfo.payment_status === 'paid' ? 'text-emerald-600' : 'text-red-500'}`}>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500 font-medium">Status</span>
+                        <span className={`font-bold px-2 py-0.5 rounded-full text-xs ${billingInfo.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                           {billingInfo.payment_status === 'paid' ? '✅ Paid' : '⚠️ Unpaid'}
                         </span>
                       </div>
                       {billingInfo.next_billing_date && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Next Billing Date</span>
-                          <span className="font-semibold text-gray-700">{billingInfo.next_billing_date}</span>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-500 font-medium">Next Billing Date</span>
+                          <span className="font-semibold text-gray-700 text-xs">{billingInfo.next_billing_date.split('T')[0] || billingInfo.next_billing_date}</span>
                         </div>
                       )}
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Account Status</span>
-                        <span className={`font-bold capitalize ${
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500 font-medium">Account Status</span>
+                        <span className={`font-bold capitalize text-xs ${
                           billingInfo.subscription_status === 'active' ? 'text-emerald-600' :
                           billingInfo.subscription_status === 'pending_approval' ? 'text-amber-600' : 'text-red-500'
                         }`}>{billingInfo.subscription_status?.replace('_', ' ')}</span>
                       </div>
                     </div>
 
+                    {/* Pay at Teqmates & Instant Activation Box */}
+                    <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-emerald-50/50 p-4 space-y-3 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm">
+                            <Zap size={15} className="fill-white" />
+                          </span>
+                          <div>
+                            <h4 className="text-sm font-bold text-gray-900">Pay at Teqmates</h4>
+                            <p className="text-[11px] text-indigo-700 font-semibold">Official Payment & Activation Partner</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1 shadow-2xs">
+                          ⚡ Activates in Minutes
+                        </span>
+                      </div>
+
+                      <div className="bg-white/90 backdrop-blur-xs p-3 rounded-xl border border-indigo-100 space-y-2 text-xs">
+                        <p className="text-gray-700 leading-relaxed font-medium">
+                          👉 <strong className="text-indigo-950 font-bold">Pay at Teqmates and share screenshot</strong> which activates your property within minutes!
+                        </p>
+                        
+                        <div className="pt-2 border-t border-gray-100 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500">Payee:</span>
+                            <span className="font-bold text-gray-800">Teqmates Technologies Pvt Ltd</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500">Teqmates UPI ID:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                teqmates@upi
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText("teqmates@upi");
+                                  setCopiedUpi(true);
+                                  setTimeout(() => setCopiedUpi(false), 2000);
+                                }}
+                                className="px-2 py-0.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors flex items-center gap-1"
+                              >
+                                {copiedUpi ? <><Check size={12} className="text-emerald-600" /> Copied!</> : <><Copy size={12} /> Copy</>}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-gray-400 pt-1">
+                            <span>Supported:</span>
+                            <span className="font-medium text-gray-600">GPay • PhonePe • Paytm • BHIM • NetBanking</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* WhatsApp Share Button */}
+                      <a
+                        href={`https://api.whatsapp.com/send?phone=919876543210&text=${encodeURIComponent(
+                          `Hi Teqmates, I have completed the payment for property "${tenantProfile?.name || billingInfo?.business_name || 'My Property'}" (Code: ${billingInfo?.branch_code || ''}). Here is my payment screenshot for instant activation.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-200 transition-all flex items-center justify-center gap-2 group"
+                      >
+                        <MessageSquare size={16} />
+                        <span>Share Screenshot on WhatsApp (+91 98765 43210)</span>
+                        <ArrowUpRight size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      </a>
+                    </div>
+
                     {billingInfo.payment_status !== 'paid' && (
                       <button
                         onClick={handlePayBill}
                         disabled={payingBill}
-                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-60 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm"
                       >
-                        {payingBill ? <>
-                          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                          Processing...
-                        </> : <><CreditCard size={16} /> Pay Monthly Bill</>}
+                        {payingBill ? (
+                          <>
+                            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                            </svg>
+                            Confirming Payment...
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard size={16} />
+                            Mark Monthly Bill as Paid
+                          </>
+                        )}
                       </button>
                     )}
                   </div>

@@ -82,6 +82,26 @@ const ItemFormModal = ({
                     </button>
                 </div>
                 <form onSubmit={onSubmit} className="p-6 space-y-6">
+                    {/* Branch Selection - Only for Enterprise View */}
+                    {activeBranchId === "all" && !editingItem && (
+                        <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
+                            <h3 className="text-md font-bold text-indigo-900 mb-3 flex items-center gap-2">
+                                🏢 Assign to Branch <span className="text-red-500">*</span>
+                            </h3>
+                            <select
+                                value={selectedBranch}
+                                onChange={(e) => setSelectedBranch(e.target.value)}
+                                className="w-full px-4 py-2.5 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium"
+                                required
+                            >
+                                <option value="">-- Select Branch --</option>
+                                {branches && branches.map(b => (
+                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-indigo-500 mt-2">You are in Enterprise View. You must select which branch this item belongs to.</p>
+                        </div>
+                    )}
 
                     {/* 1. Basic Information Section */}
                     <div className="border-b border-gray-200 pb-6">

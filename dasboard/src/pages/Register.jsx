@@ -28,7 +28,12 @@ import {
   Upload,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Zap,
+  MessageSquare,
+  Copy,
+  Check,
+  ArrowUpRight
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -65,6 +70,29 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [pendingApproval, setPendingApproval] = useState(false); // Show after successful registration
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [registeredTenant, setRegisteredTenant] = useState(null);
+  const [raiseUtr, setRaiseUtr] = useState("");
+  const [raisingPayment, setRaisingPayment] = useState(false);
+  const [paymentRaisedSuccess, setPaymentRaisedSuccess] = useState(false);
+
+  const handleRaisePaymentPending = async (e) => {
+    e.preventDefault();
+    if (!raiseUtr.trim()) return;
+    setRaisingPayment(true);
+    try {
+      await api.post("/saas/raise-payment", {
+        tenant_id: registeredTenant?.id,
+        branch_code: branchCode,
+        transaction_ref: raiseUtr.trim()
+      });
+      setPaymentRaisedSuccess(true);
+    } catch (err) {
+      alert(err.response?.data?.detail || "Failed to raise payment. Please try again.");
+    } finally {
+      setRaisingPayment(false);
+    }
+  };
 
   // Auto-generate slug from business name unless user manually edits it
   useEffect(() => {
@@ -126,7 +154,7 @@ export default function RegisterPage() {
     }
 
     if (!branchCode.trim()) {
-      setErrorMsg("Aiosell Hotel Code is compulsory. Please enter your hotel code.");
+      setErrorMsg("Property Code / Hotel Code is compulsory. Please enter your hotel code.");
       return;
     }
 
@@ -173,35 +201,19 @@ export default function RegisterPage() {
 
       const res = await api.post("/saas/register", payload);
 
-      if (res.data && res.data.access_token) {
-        // Store session tokens
-        localStorage.setItem("token", res.data.access_token);
-        
-        try {
-          const decoded = jwtDecode(res.data.access_token);
-          const permissions = decoded.permissions || [];
-          const role = decoded.role ? decoded.role.toLowerCase() : 'admin';
-          const userBranchId = decoded.branch_id || (res.data.branch ? res.data.branch.id : null);
+      if (res.data && res.data.success) {
+        // Clear any tokens so user cannot bypass login before Super Admin acceptance
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("permissions");
+        localStorage.removeItem("activeBranchId");
 
-          localStorage.setItem("user", JSON.stringify({
-            role,
-            is_superadmin: Boolean(decoded.is_superadmin || false),
-            permissions,
-            tenant_id: res.data.tenant.id,
-            tenant_slug: res.data.tenant.slug
-          }));
-          localStorage.setItem("permissions", JSON.stringify(permissions));
-
-          if (userBranchId) {
-            localStorage.setItem("activeBranchId", userBranchId);
-          }
-
-          // Show pending approval screen instead of navigating immediately
-          setPendingApproval(true);
-        } catch (tokenErr) {
-          console.error("Token decode error:", tokenErr);
-          setPendingApproval(true);
+        if (res.data.tenant) {
+          setRegisteredTenant(res.data.tenant);
         }
+
+        // Show pending approval screen
+        setPendingApproval(true);
       } else {
         setErrorMsg("Failed to complete setup. Please try again.");
       }
@@ -224,18 +236,120 @@ export default function RegisterPage() {
           </div>
           <h1 className="text-2xl font-extrabold text-gray-900 mb-3">Registration Submitted!</h1>
           <p className="text-gray-600 text-base leading-relaxed mb-6">
-            Your property has been registered successfully. Once the platform admin reviews and <strong>accepts your property</strong>, the full app features will be unlocked.
+            Your property registration has been submitted successfully. Your account and property will be activated <strong>only after Super Admin accepts your registration and confirms payment</strong>.
           </p>
+          {/* Fast-Track Activation via Teqmates Box */}
+          <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-emerald-50/50 p-4 mb-6 space-y-3 text-left shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm">
+                  <Zap size={15} className="fill-white" />
+                </span>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 leading-tight">Pay at Teqmates</h4>
+                  <p className="text-[11px] text-indigo-700 font-semibold">Fast-Track Activation</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
+                ⚡ Within Minutes
+              </span>
+            </div>
+
+            <div className="bg-white/95 p-3 rounded-xl border border-indigo-100 space-y-2 text-xs">
+              <p className="text-gray-700 font-medium leading-relaxed">
+                👉 <strong className="text-indigo-950 font-bold">Pay at Teqmates and share screenshot</strong> to activate your property within minutes!
+              </p>
+              <div className="pt-2 border-t border-gray-100 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Payee:</span>
+                  <span className="font-bold text-gray-800">Teqmates Technologies Pvt Ltd</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Teqmates UPI ID:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                      teqmates@upi
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText("teqmates@upi");
+                        setCopiedUpi(true);
+                        setTimeout(() => setCopiedUpi(false), 2000);
+                      }}
+                      className="px-2 py-0.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors flex items-center gap-1"
+                    >
+                      {copiedUpi ? <><Check size={12} className="text-emerald-600" /> Copied!</> : <><Copy size={12} /> Copy</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2: Submit UTR to Raise Payment */}
+              {paymentRaisedSuccess ? (
+                <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-emerald-900 text-xs flex items-start gap-2 shadow-xs">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Payment Raised Successfully!</p>
+                    <p className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed">
+                      UTR <span className="font-mono font-bold text-emerald-950">{raiseUtr}</span> submitted. Super Admin will verify and accept your payment to activate your property.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleRaisePaymentPending} className="bg-white/95 p-3 rounded-xl border border-indigo-100 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-800 text-[11px] uppercase tracking-wide">
+                      Already Paid? Raise Payment with UTR:
+                    </span>
+                    <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                      Step 2
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={raiseUtr}
+                      onChange={(e) => setRaiseUtr(e.target.value)}
+                      placeholder="Enter 12-digit UTR / Txn ID"
+                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-mono uppercase focus:border-indigo-500 focus:outline-none"
+                      required
+                    />
+                    <button
+                      type="submit"
+                      disabled={raisingPayment || !raiseUtr.trim()}
+                      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition-colors shrink-0 shadow-xs"
+                    >
+                      {raisingPayment ? "Submitting..." : "Raise Payment"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            <a
+              href={`https://api.whatsapp.com/send?phone=919876543210&text=${encodeURIComponent(
+                `Hi Teqmates, I have registered my property "${businessName}" (Code: ${branchCode}). Please find my payment screenshot attached to activate my property within minutes.`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-200 transition-all flex items-center justify-center gap-2 group"
+            >
+              <MessageSquare size={16} />
+              <span>Share Screenshot on WhatsApp (+91 98765 43210)</span>
+              <ArrowUpRight size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </a>
+          </div>
+
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
             <div className="flex items-start gap-3">
               <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-amber-800">What happens next?</p>
+                <p className="text-sm font-semibold text-amber-800">Standard Activation</p>
                 <ul className="text-xs text-amber-700 mt-1 space-y-1 list-disc ml-4">
-                  <li>Admin team reviews your property details</li>
-                  <li>Once approved, you get full access immediately</li>
-                  <li>Monthly billing starts from day one of approval</li>
-                  <li>You can log in and view your billing anytime</li>
+                  <li>Admin team reviews your registration details</li>
+                  <li>Once verified and approved, full access is granted</li>
+                  <li>You can log in and view your property status anytime</li>
                 </ul>
               </div>
             </div>
@@ -415,11 +529,11 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* Branch Code / Aiosell Hotel Code (Compulsory) */}
+              {/* Branch Code / Hotel Code (Compulsory) */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-gray-700">
-                    Branch Code / Aiosell Hotel Code <span className="text-red-500 font-bold">*</span>
+                    Branch Code / Hotel Code <span className="text-red-500 font-bold">*</span>
                   </label>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                     Compulsory
@@ -439,7 +553,7 @@ export default function RegisterPage() {
                   />
                 </div>
                 <p className="text-[11px] text-gray-500 mt-1">
-                  Used for Aiosell Channel Manager sync. Must match your Aiosell hotel code exactly.
+                  Used for Channel Manager sync. Must match your hotel code exactly.
                 </p>
               </div>
 

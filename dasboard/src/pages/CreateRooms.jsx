@@ -799,7 +799,7 @@ const RoomTypeModal = ({ onClose, type, isEditing, onSubmit, branches, isEnterpr
                     </div>
 
                   <div>
-                    <label className="block text-[11px] font-black text-indigo-400 uppercase tracking-tighter mb-1.5 ml-1">Channel Manager Code (Aiosell)</label>
+                    <label className="block text-[11px] font-black text-indigo-400 uppercase tracking-tighter mb-1.5 ml-1">Channel Manager Code</label>
                     <div className="relative group">
                       <i className="fas fa-link absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors"></i>
                       <input 
@@ -897,7 +897,7 @@ const RoomTypeModal = ({ onClose, type, isEditing, onSubmit, branches, isEnterpr
           <div className="bg-white p-6 rounded-2xl border-2 border-indigo-100 shadow-sm md:col-span-2">
             <div className="flex justify-between items-center mb-6">
               <label className="block text-sm font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
-                <i className="fas fa-list-ul text-lg"></i> Aiosell Rate Plan Mapping
+                <i className="fas fa-list-ul text-lg"></i> Channel Manager Rate Plan Mapping
               </label>
               <button 
                 type="button" 
@@ -940,7 +940,7 @@ const RoomTypeModal = ({ onClose, type, isEditing, onSubmit, branches, isEnterpr
 
                     <div className="flex-[2] min-w-[200px]">
                       <label className="block text-[11px] font-black text-indigo-500 uppercase mb-1 ml-1 tracking-wider flex items-center justify-between">
-                        <span>Aiosell Rateplan ID</span>
+                        <span>Channel Manager Rateplan ID</span>
                         <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md">OTA Sync Key</span>
                       </label>
                       <div className="relative">
@@ -1042,7 +1042,7 @@ const RoomTypeModal = ({ onClose, type, isEditing, onSubmit, branches, isEnterpr
                     <i className="fas fa-link-slash text-gray-300 text-2xl"></i>
                   </div>
                   <p className="text-sm text-gray-500 font-black uppercase tracking-widest">No mappings defined</p>
-                  <p className="text-xs text-gray-400 mt-1">Add rate plans to sync rates and availability with Aiosell</p>
+                  <p className="text-xs text-gray-400 mt-1">Add rate plans to sync rates and availability with Channel Manager</p>
                 </div>
               )}
             </div>

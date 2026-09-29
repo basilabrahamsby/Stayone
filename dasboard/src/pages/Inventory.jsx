@@ -1520,9 +1520,18 @@ const Inventory = () => {
         // Update local state directly
         setItems(prev => prev.map(item => item.id === res.data.id ? res.data : item));
       } else {
+        const isEnterpriseView = activeBranchId === 'all';
         const config = {
           headers: { "Content-Type": "multipart/form-data" }
         };
+        if (isEnterpriseView) {
+          if (!selectedBranchForCreation) {
+            addNotification({ title: "Branch Required", message: "Please select a branch to assign this item to.", type: "error" });
+            setIsSubmitting(false);
+            return;
+          }
+          config.headers["X-Branch-ID"] = selectedBranchForCreation;
+        }
 
         const res = await API.post("/inventory/items", formData, config);
         addNotification({ title: "Success", message: "Item created successfully!", type: "success" });
@@ -1607,7 +1616,16 @@ const Inventory = () => {
         addNotification({ title: "Success", message: "Category updated successfully!", type: "success" });
         setCategories(prev => prev.map(c => c.id === res.data.id ? res.data : c));
       } else {
-        const res = await API.post("/inventory/categories", categoryForm);
+        const isEnterpriseView = activeBranchId === 'all';
+        const config = {};
+        if (isEnterpriseView) {
+          if (!selectedBranchForCreation) {
+            addNotification({ title: "Branch Required", message: "Please select a branch to assign this category to.", type: "error" });
+            return;
+          }
+          config.headers = { "X-Branch-ID": selectedBranchForCreation };
+        }
+        const res = await API.post("/inventory/categories", categoryForm, config);
         addNotification({ title: "Success", message: "Category created successfully!", type: "success" });
         setCategories(prev => [res.data, ...prev]);
       }
@@ -5473,6 +5491,26 @@ function CategoryFormModal({ form, setForm, onSubmit, onClose, activeBranchId, s
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-6">
+          {/* Branch Selection - Only for Enterprise View */}
+          {activeBranchId === "all" && (
+            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
+              <h3 className="text-md font-bold text-indigo-900 mb-3 flex items-center gap-2">
+                🏢 Assign to Branch <span className="text-red-500">*</span>
+              </h3>
+              <select
+                value={selectedBranchForCreation}
+                onChange={(e) => setSelectedBranchForCreation(e.target.value)}
+                className="w-full px-4 py-2.5 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium"
+                required
+              >
+                <option value="">-- Select Branch --</option>
+                {branches && branches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-indigo-500 mt-2">You are in Enterprise View. You must select which branch this category belongs to.</p>
+            </div>
+          )}
 
           {/* Basic Information */}
           <div className="border-b border-gray-200 pb-4">

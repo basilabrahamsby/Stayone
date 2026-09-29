@@ -34,6 +34,7 @@ import Settings from "./pages/Settings.jsx";
 import ActivityLogs from "./pages/ActivityLogs.jsx";
 import Laundry from "./pages/Laundry.jsx";
 import DayAudit from "./pages/DayAudit.jsx";
+import SubscriptionBilling from "./pages/SubscriptionBilling.jsx";
 
 const getRouterBasename = () => {
   if (typeof window === "undefined") {
@@ -185,6 +186,10 @@ function App() {
               }
             />
             <Route
+              path="/reports"
+              element={<Navigate to="/report" replace />}
+            />
+            <Route
               path="/guestprofiles"
               element={
                 <ProtectedRoute requiredPermission="/guestprofiles">
@@ -261,6 +266,30 @@ function App() {
               element={
                 <ProtectedRoute requiredPermission="/activity-logs">
                   <ActivityLogs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscription"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionBilling />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscription-billing"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionBilling />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payments"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionBilling />
                 </ProtectedRoute>
               }
             />

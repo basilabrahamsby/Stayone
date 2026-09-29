@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranch } from '../contexts/BranchContext';
-import { Plus, Edit2, Power, Building2, MapPin, Phone, Mail, Percent, Globe, Facebook, Instagram, Twitter, Linkedin, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Power, Building2, MapPin, Phone, Mail, Percent, Globe, Facebook, Instagram, Twitter, Linkedin, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import DashboardLayout from '../layout/DashboardLayout';
@@ -84,12 +84,14 @@ export default function BranchManagement() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
+    const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         code: '',
         address: '',
         phone: '',
         email: '',
+        password: '',
         gst_number: '',
         facebook: '',
         instagram: '',
@@ -118,6 +120,7 @@ export default function BranchManagement() {
     const handleOpenModal = (branch = null) => {
         setImageFile(null);
         setImagePreview(null);
+        setShowPassword(false);
         if (branch) {
             setEditingBranch(branch);
             setFormData({
@@ -126,6 +129,7 @@ export default function BranchManagement() {
                 address: branch.address || '',
                 phone: branch.phone || '',
                 email: branch.email || '',
+                password: '',
                 gst_number: branch.gst_number || '',
                 facebook: branch.facebook || '',
                 instagram: branch.instagram || '',
@@ -144,6 +148,7 @@ export default function BranchManagement() {
                 address: '',
                 phone: '',
                 email: '',
+                password: '',
                 gst_number: '',
                 facebook: '',
                 instagram: '',
@@ -182,11 +187,20 @@ export default function BranchManagement() {
             return;
         }
 
+        if (formData.password && formData.password.trim().length > 0 && formData.password.trim().length < 6) {
+            toast.error('Password must be at least 6 characters long');
+            return;
+        }
+
         try {
             setIsSubmitting(true);
             const data = new FormData();
             Object.keys(formData).forEach(key => {
-                if (formData[key] !== null && formData[key] !== undefined) {
+                if (key === 'password') {
+                    if (formData.password && formData.password.trim().length > 0) {
+                        data.append('password', formData.password.trim());
+                    }
+                } else if (formData[key] !== null && formData[key] !== undefined) {
                     data.append(key, formData[key]);
                 }
             });
@@ -371,7 +385,7 @@ export default function BranchManagement() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Branch Code / Aiosell Hotel Code</label>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Branch Code / Hotel Code</label>
                                                 <input
                                                     type="text"
                                                     required
@@ -380,7 +394,7 @@ export default function BranchManagement() {
                                                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono tracking-wider"
                                                     placeholder="e.g., BEACH, MAIN, HCC001"
                                                 />
-                                                <p className="text-[11px] text-gray-400 mt-1">Used for Aiosell Channel Manager sync. Must match your Aiosell hotel code exactly.</p>
+                                                <p className="text-[11px] text-gray-400 mt-1">Used for Channel Manager sync. Must match your hotel code exactly.</p>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>
@@ -415,6 +429,33 @@ export default function BranchManagement() {
                                                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                                     placeholder="contact@resort.com"
                                                 />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center justify-between">
+                                                    <span>Admin Account Password</span>
+                                                    <span className="text-[10px] text-gray-400 font-normal lowercase">{editingBranch ? "(leave blank to keep current)" : "(optional)"}</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                                        <Lock size={16} />
+                                                    </div>
+                                                    <input
+                                                        type={showPassword ? "text" : "password"}
+                                                        value={formData.password}
+                                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                                        className="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-gray-400 text-sm"
+                                                        placeholder={editingBranch ? "Set new admin password" : "Create admin password"}
+                                                        autoComplete="new-password"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowPassword(!showPassword)}
+                                                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                                                        tabIndex={-1}
+                                                    >
+                                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
 

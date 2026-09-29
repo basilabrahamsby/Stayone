@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
 import api from "../services/api";
-import { Settings as SettingsIcon, FileText, Upload, Trash2, Download, Save, Globe, Calendar as CalendarIcon, Plus, Eye, Percent, Zap, ZapOff, CreditCard } from "lucide-react";
+import { Settings as SettingsIcon, FileText, Upload, Trash2, Download, Save, Globe, Calendar as CalendarIcon, Plus, Eye, EyeOff, Lock, CheckCircle, Percent, Zap, ZapOff, CreditCard, Copy, Check, MessageSquare, ArrowUpRight } from "lucide-react";
 import { formatDateIST } from "../utils/dateUtils";
 import { useBranch } from "../contexts/BranchContext";
 
@@ -43,6 +43,7 @@ export default function Settings() {
     const [billingInfo, setBillingInfo] = useState(null);
     const [billingLoading, setBillingLoading] = useState(false);
     const [payingBill, setPayingBill] = useState(false);
+    const [copiedUpi, setCopiedUpi] = useState(false);
 
     const fetchBillingInfo = async () => {
         setBillingLoading(true);
@@ -78,6 +79,60 @@ export default function Settings() {
         description: "" // Fixed case
     });
     const [loadingCalendar, setLoadingCalendar] = useState(false);
+
+    // Password & Security State
+    const [passwordForm, setPasswordForm] = useState({
+        current_password: "",
+        new_password: "",
+        confirm_password: ""
+    });
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const [passwordSuccess, setPasswordSuccess] = useState("");
+    const [passwordError, setPasswordError] = useState("");
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        setPasswordError("");
+        setPasswordSuccess("");
+
+        if (!passwordForm.current_password) {
+            setPasswordError("Please enter your current password.");
+            return;
+        }
+        if (!passwordForm.new_password) {
+            setPasswordError("Please enter your new password.");
+            return;
+        }
+        if (passwordForm.new_password.length < 6) {
+            setPasswordError("New password must be at least 6 characters long.");
+            return;
+        }
+        if (passwordForm.new_password !== passwordForm.confirm_password) {
+            setPasswordError("New password and confirmation do not match.");
+            return;
+        }
+
+        try {
+            setIsChangingPassword(true);
+            const res = await api.post("/auth/change-password", {
+                current_password: passwordForm.current_password,
+                new_password: passwordForm.new_password
+            });
+            setPasswordSuccess(res.data?.message || "Password changed successfully!");
+            setPasswordForm({
+                current_password: "",
+                new_password: "",
+                confirm_password: ""
+            });
+        } catch (err) {
+            setPasswordError(err.response?.data?.detail || "Failed to update password. Please check your current password.");
+        } finally {
+            setIsChangingPassword(false);
+        }
+    };
 
     // Fetch System Settings
     const fetchSettings = async () => {
@@ -348,6 +403,16 @@ export default function Settings() {
                             >
                                 <CreditCard className="inline mr-2" size={18} />
                                 Property Billing
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("security")}
+                                className={`px-6 py-3 font-medium rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "security"
+                                    ? "bg-indigo-600 text-white"
+                                    : "text-gray-600 hover:bg-gray-100"
+                                    }`}
+                            >
+                                <Lock className="inline mr-2" size={18} />
+                                Security & Password
                             </button>
                         </div>
                     </div>
@@ -953,7 +1018,7 @@ export default function Settings() {
                                 <CreditCard className="text-indigo-600" size={22} />
                                 Property Billing &amp; Subscription
                             </h2>
-                            <p className="text-gray-500 text-sm mb-6">View your monthly plan, Aiosell branch code, and pay your invoice.</p>
+                            <p className="text-gray-500 text-sm mb-6">View your monthly plan, property branch code, and pay your invoice.</p>
 
                             {billingLoading ? (
                                 <div className="text-center py-12 text-gray-400">Loading billing info...</div>
@@ -977,8 +1042,8 @@ export default function Settings() {
                                     {/* Billing Details */}
                                     <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
                                         {[
-                                            { label: 'Plan', value: <span className="capitalize font-semibold">{billingInfo.plan || 'starter'}</span> },
-                                            { label: 'Aiosell Branch Code / Hotel Code', value: <span className="font-mono font-bold text-indigo-700 tracking-wider">{billingInfo.branch_code || '—'}</span> },
+                                            { label: 'Plan', value: <span className="capitalize font-semibold">{(typeof billingInfo.plan === 'object' ? billingInfo.plan?.name || billingInfo.plan?.code : billingInfo.plan) || 'starter'}</span> },
+                                            { label: 'Branch Code / Hotel Code', value: <span className="font-mono font-bold text-indigo-700 tracking-wider">{billingInfo.branch_code || '—'}</span> },
                                             { label: 'Monthly Fee', value: <span className="font-bold text-gray-900">₹{billingInfo.monthly_amount?.toLocaleString() || '—'}</span> },
                                             { label: 'Payment Status', value: <span className={`font-bold ${billingInfo.payment_status === 'paid' ? 'text-emerald-600' : 'text-red-500'}`}>{billingInfo.payment_status === 'paid' ? '✅ Paid' : '⚠️ Unpaid'}</span> },
                                             ...(billingInfo.next_billing_date ? [{ label: 'Next Billing Date', value: <span className="font-semibold">{billingInfo.next_billing_date}</span> }] : []),
@@ -991,21 +1056,89 @@ export default function Settings() {
                                         ))}
                                     </div>
 
+                                    {/* Pay at Teqmates & Instant Activation Card */}
+                                    <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-emerald-50/50 p-5 space-y-3.5 shadow-xs">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm">
+                                                    <Zap size={16} className="fill-white" />
+                                                </span>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-gray-900 leading-tight">Pay at Teqmates</h4>
+                                                    <p className="text-xs text-indigo-700 font-semibold">Official Payment &amp; Activation Partner</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] font-extrabold uppercase tracking-wide bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1 shadow-2xs">
+                                                ⚡ Activates in Minutes
+                                            </span>
+                                        </div>
+
+                                        <div className="bg-white/90 backdrop-blur-xs p-4 rounded-xl border border-indigo-100 space-y-2.5 text-xs">
+                                            <p className="text-gray-700 leading-relaxed font-medium">
+                                                👉 <strong className="text-indigo-950 font-bold">Pay at Teqmates and share screenshot</strong> which activates your property within minutes!
+                                            </p>
+                                            
+                                            <div className="pt-2 border-t border-gray-100 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-500 font-medium">Payee Name:</span>
+                                                    <span className="font-bold text-gray-800">Teqmates Technologies Pvt Ltd</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-500 font-medium">Teqmates UPI ID:</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                                            teqmates@upi
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText("teqmates@upi");
+                                                                setCopiedUpi(true);
+                                                                setTimeout(() => setCopiedUpi(false), 2000);
+                                                            }}
+                                                            className="px-2 py-0.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors flex items-center gap-1"
+                                                        >
+                                                            {copiedUpi ? <><Check size={12} className="text-emerald-600" /> Copied!</> : <><Copy size={12} /> Copy</>}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[11px] text-gray-400 pt-1">
+                                                    <span>Supported Methods:</span>
+                                                    <span className="font-medium text-gray-600">GPay • PhonePe • Paytm • BHIM • NetBanking</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* WhatsApp Share Button */}
+                                        <a
+                                            href={`https://api.whatsapp.com/send?phone=919876543210&text=${encodeURIComponent(
+                                                `Hi Teqmates, I have completed the payment for property "${billingInfo?.business_name || 'My Property'}" (Code: ${billingInfo?.branch_code || ''}). Here is my payment screenshot for instant activation.`
+                                            )}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-200 transition-all flex items-center justify-center gap-2 group"
+                                        >
+                                            <MessageSquare size={16} />
+                                            <span>Share Screenshot on WhatsApp (+91 98765 43210)</span>
+                                            <ArrowUpRight size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                        </a>
+                                    </div>
+
                                     {billingInfo.payment_status !== 'paid' && (
                                         <button
                                             onClick={handlePayBill}
                                             disabled={payingBill}
-                                            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 text-base shadow-lg shadow-indigo-200"
+                                            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-60 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md"
                                         >
                                             {payingBill ? (
                                                 <><svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Processing Payment...</>
                                             ) : (
-                                                <><CreditCard size={18} /> Pay Monthly Bill (₹{billingInfo.monthly_amount?.toLocaleString() || '—'})</>
+                                                <><CreditCard size={18} /> Mark Monthly Bill as Paid (₹{billingInfo.monthly_amount?.toLocaleString() || '—'})</>
                                             )}
                                         </button>
                                     )}
 
-                                    <p className="text-xs text-gray-400 text-center">Billing is monthly. Contact support for plan changes or queries.</p>
+                                    <p className="text-xs text-gray-400 text-center">Billing is monthly. Contact Teqmates support for plan upgrades or queries.</p>
                                 </div>
                             ) : (
                                 <div className="text-center py-12 text-gray-400">
@@ -1013,6 +1146,149 @@ export default function Settings() {
                                     <p>No billing information available. This may be a staff account.</p>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Security & Password Tab */}
+                {activeTab === "security" && (
+                    <div className="space-y-6 max-w-2xl">
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+                            <div className="flex items-center gap-3 pb-5 border-b border-gray-100 mb-6">
+                                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                                    <Lock size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800">Change Account Password</h2>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Update your account credentials to keep your account secure.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {passwordSuccess && (
+                                <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm flex items-center gap-2.5 font-medium animate-fadeIn">
+                                    <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+                                    <span>{passwordSuccess}</span>
+                                </div>
+                            )}
+
+                            {passwordError && (
+                                <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-sm flex items-center gap-2.5 font-medium animate-fadeIn">
+                                    <span className="shrink-0 text-rose-500 font-bold">⚠️</span>
+                                    <span>{passwordError}</span>
+                                </div>
+                            )}
+
+                            <form onSubmit={handleChangePassword} className="space-y-5">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        Current Password
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                            <Lock size={16} />
+                                        </div>
+                                        <input
+                                            type={showCurrentPassword ? "text" : "password"}
+                                            value={passwordForm.current_password}
+                                            onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                                            className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400"
+                                            placeholder="Enter your current password"
+                                            required
+                                            autoComplete="current-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                                            tabIndex={-1}
+                                        >
+                                            {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        New Password
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                            <Lock size={16} />
+                                        </div>
+                                        <input
+                                            type={showNewPassword ? "text" : "password"}
+                                            value={passwordForm.new_password}
+                                            onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                                            className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400"
+                                            placeholder="Enter new password (min. 6 characters)"
+                                            required
+                                            autoComplete="new-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewPassword(!showNewPassword)}
+                                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                                            tabIndex={-1}
+                                        >
+                                            {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 mt-1">Must be at least 6 characters long.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        Confirm New Password
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                            <Lock size={16} />
+                                        </div>
+                                        <input
+                                            type={showConfirmPassword ? "text" : "password"}
+                                            value={passwordForm.confirm_password}
+                                            onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                                            className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400"
+                                            placeholder="Confirm your new password"
+                                            required
+                                            autoComplete="new-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                                            tabIndex={-1}
+                                        >
+                                            {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="pt-3">
+                                    <button
+                                        type="submit"
+                                        disabled={isChangingPassword}
+                                        className="w-full py-3 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2 disabled:opacity-60 text-sm"
+                                    >
+                                        {isChangingPassword ? (
+                                            <>
+                                                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                                </svg>
+                                                Updating Password...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save size={16} />
+                                                Update Password
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 )}

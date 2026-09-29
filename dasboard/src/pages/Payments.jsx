@@ -1,1 +1,2 @@
-// Payments.jsx placeholder
+import SubscriptionBilling from "./SubscriptionBilling";
+export default SubscriptionBilling;

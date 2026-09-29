@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
 import { formatCurrency } from '../utils/currency';
 import API from "../services/api";
-import { Building2, Users, Receipt, PiggyBank, Briefcase, Activity, CheckCircle, Clock, Shield, Hash, Ban, Power, Search, Filter, X, RotateCcw, Edit2, Camera, Upload, Loader2 } from "lucide-react";
+import { Building2, Users, Receipt, PiggyBank, Briefcase, Activity, CheckCircle, Clock, Shield, Hash, Ban, Power, Search, Filter, X, RotateCcw, Edit2, Camera, Upload, Loader2, Lock, Eye, EyeOff, CreditCard, Calendar, Layers, Sparkles, CheckCircle2, ChevronRight, Tag } from "lucide-react";
 
 // Premium styles imported
 import "../styles/premium-dashboard.css";
@@ -140,18 +140,163 @@ export default function SuperAdminDashboard() {
         }
     };
 
+    // SaaS Plans Management State & Handlers
+    const [saasPlans, setSaasPlans] = useState([]);
+    const [plansLoading, setPlansLoading] = useState(false);
+    const [editingPlan, setEditingPlan] = useState(null);
+    const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+    const [savingPlan, setSavingPlan] = useState(false);
+    const [planFormData, setPlanFormData] = useState({
+        name: "",
+        code: "",
+        price_monthly: 0,
+        price_yearly: 0,
+        max_rooms: 15,
+        max_branches: 1,
+        max_staff_users: 5,
+        description: "",
+        badge: "",
+        features: "",
+        is_active: true,
+        update_existing_tenants: false
+    });
+
+    const fetchSaasPlans = async () => {
+        setPlansLoading(true);
+        try {
+            const res = await API.get("/saas/admin/plans");
+            setSaasPlans(res.data || []);
+        } catch (e) {
+            console.error("Failed to load SaaS plans:", e);
+        } finally {
+            setPlansLoading(false);
+        }
+    };
+
+    const handleOpenEditPlanModal = (plan) => {
+        if (!plan) return;
+        setEditingPlan(plan);
+        setPlanFormData({
+            name: plan.name || "",
+            code: plan.code || "",
+            price_monthly: plan.price_monthly !== undefined ? plan.price_monthly : 0,
+            price_yearly: plan.price_yearly !== undefined ? plan.price_yearly : 0,
+            max_rooms: plan.max_rooms !== undefined ? plan.max_rooms : 15,
+            max_branches: plan.max_branches !== undefined ? plan.max_branches : 1,
+            max_staff_users: plan.max_staff_users !== undefined ? plan.max_staff_users : 5,
+            description: plan.description || "",
+            badge: plan.badge || "",
+            features: Array.isArray(plan.features) ? plan.features.join("\n") : "",
+            is_active: plan.is_active !== false,
+            update_existing_tenants: false
+        });
+        setIsPlanModalOpen(true);
+    };
+
+    const handleSavePlan = async (e) => {
+        e.preventDefault();
+        if (!editingPlan) return;
+        setSavingPlan(true);
+        try {
+            const featureArray = (planFormData.features || "")
+                .split("\n")
+                .map(f => f.trim())
+                .filter(f => f.length > 0);
+
+            const payload = {
+                name: planFormData.name,
+                price_monthly: parseFloat(planFormData.price_monthly) || 0,
+                price_yearly: parseFloat(planFormData.price_yearly) || 0,
+                max_rooms: parseInt(planFormData.max_rooms) || 1,
+                max_branches: parseInt(planFormData.max_branches) || 1,
+                max_staff_users: parseInt(planFormData.max_staff_users) || 1,
+                description: planFormData.description,
+                badge: planFormData.badge,
+                features: featureArray,
+                is_active: planFormData.is_active,
+                update_existing_tenants: planFormData.update_existing_tenants
+            };
+
+            const res = await API.put(`/saas/admin/plans/${editingPlan.id}`, payload);
+            alert(`✅ ${res.data?.message || "Plan updated successfully!"}`);
+            setIsPlanModalOpen(false);
+            fetchSaasPlans();
+            fetchTenants();
+        } catch (err) {
+            console.error("Save plan error:", err);
+            alert(err.response?.data?.detail || "Failed to update SaaS plan.");
+        } finally {
+            setSavingPlan(false);
+        }
+    };
+
     const handleApproveTenant = async (tenantId) => {
         const enteredCode = (hotelCodes[tenantId] !== undefined ? hotelCodes[tenantId] : "").trim().toUpperCase();
         setApprovingId(tenantId);
         try {
             const payload = enteredCode ? { branch_code: enteredCode } : {};
             const res = await API.post(`/saas/admin/approve-tenant/${tenantId}`, payload);
-            alert(`✅ ${res.data?.message || "Property approved! Full access has been granted."}`);
+            alert(`✅ ${res.data?.message || "Property approved and activated! Property admin can now log in."}`);
             fetchTenants();
+            // Refresh global branches
+            const config = { headers: { "X-Branch-ID": "all" } };
+            const bRes = await API.get("/branches?include_inactive=true", config);
+            setBranches(bRes.data || []);
         } catch (e) {
             alert(e.response?.data?.detail || "Approval failed. Please try again.");
         } finally {
             setApprovingId(null);
+        }
+    };
+
+    const [acceptingPaymentId, setAcceptingPaymentId] = useState(null);
+
+    const handleAcceptPayment = async (tenant, targetStatus = "paid") => {
+        if (!tenant || !tenant.id) return;
+        const isMarkingPaid = targetStatus === "paid";
+        let confirmMsg = "";
+        let transactionRef = tenant.payment_ref || "";
+
+        if (isMarkingPaid) {
+            if (tenant.payment_status === "payment_raised") {
+                confirmMsg = `Payment of ₹${(tenant.monthly_amount || 0).toLocaleString()} was RAISED by "${tenant.business_name || tenant.name}".\n\n` +
+                    `• UTR / Ref: ${tenant.payment_ref || "N/A"}\n` +
+                    `• Method: ${tenant.payment_method || "UPI (Teqmates)"}\n\n` +
+                    `Do you want to ACCEPT this payment and activate the property workspace?`;
+            } else {
+                const userRef = window.prompt(
+                    `This property has NOT raised payment yet.\n\nTo raise and accept payment now on behalf of this property, enter UTR / Transaction Reference (or leave default for offline/direct payment):`,
+                    `TXN-${Date.now()}`
+                );
+                if (userRef === null) return; // cancelled
+                transactionRef = userRef.trim() || `TXN-${Date.now()}`;
+                confirmMsg = `Confirm raising and accepting payment for "${tenant.business_name || tenant.name}" with Ref "${transactionRef}"?`;
+            }
+        } else {
+            confirmMsg = `Are you sure you want to mark payment as UNPAID for "${tenant.business_name || tenant.name}"?`;
+        }
+
+        if (confirmMsg && !window.confirm(confirmMsg)) return;
+
+        try {
+            setAcceptingPaymentId(tenant.id);
+            const res = await API.post(`/saas/admin/accept-payment/${tenant.id}`, {
+                payment_status: targetStatus,
+                payment_method: tenant.payment_method || "Accepted by SuperAdmin",
+                transaction_ref: transactionRef,
+                activate_property: true
+            });
+            alert(`✅ ${res.data?.message || "Payment status updated successfully!"}`);
+            fetchTenants();
+            // Refresh global branches
+            const config = { headers: { "X-Branch-ID": "all" } };
+            const bRes = await API.get("/branches?include_inactive=true", config);
+            setBranches(bRes.data || []);
+        } catch (err) {
+            console.error("Accept payment error:", err);
+            alert(err.response?.data?.detail || "Failed to update payment status.");
+        } finally {
+            setAcceptingPaymentId(null);
         }
     };
 
@@ -208,12 +353,16 @@ export default function SuperAdminDashboard() {
     const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
     const [editImageFile, setEditImageFile] = useState(null);
     const [editImagePreview, setEditImagePreview] = useState(null);
+    const [showEditPassword, setShowEditPassword] = useState(false);
     const [editFormData, setEditFormData] = useState({
         name: '',
         code: '',
         address: '',
         phone: '',
         email: '',
+        password: '',
+        payment_status: 'paid',
+        monthly_amount: 2500,
         gst_number: '',
         facebook: '',
         instagram: '',
@@ -251,6 +400,8 @@ export default function SuperAdminDashboard() {
                     address: '',
                     location: '',
                     gst_number: '',
+                    payment_status: target.payment_status || 'paid',
+                    monthly_amount: target.monthly_amount !== undefined ? target.monthly_amount : 2500,
                     tenant_id: target.id
                 };
             }
@@ -263,6 +414,9 @@ export default function SuperAdminDashboard() {
             address: branchToEdit.address || '',
             phone: branchToEdit.phone || '',
             email: branchToEdit.email || '',
+            password: '',
+            payment_status: target.payment_status || branchToEdit.payment_status || 'paid',
+            monthly_amount: target.monthly_amount !== undefined ? target.monthly_amount : (branchToEdit.monthly_amount !== undefined ? branchToEdit.monthly_amount : 2500),
             gst_number: branchToEdit.gst_number || '',
             facebook: branchToEdit.facebook || '',
             instagram: branchToEdit.instagram || '',
@@ -270,6 +424,7 @@ export default function SuperAdminDashboard() {
             linkedin: branchToEdit.linkedin || '',
             location: branchToEdit.location || ''
         });
+        setShowEditPassword(false);
         setEditImageFile(null);
         if (branchToEdit.image_url) {
             setEditImagePreview(
@@ -317,11 +472,20 @@ export default function SuperAdminDashboard() {
             return;
         }
 
+        if (editFormData.password && editFormData.password.trim().length > 0 && editFormData.password.trim().length < 6) {
+            alert('Password must be at least 6 characters long');
+            return;
+        }
+
         try {
             setIsSubmittingEdit(true);
             const data = new FormData();
             Object.keys(editFormData).forEach(key => {
-                if (editFormData[key] !== null && editFormData[key] !== undefined) {
+                if (key === 'password') {
+                    if (editFormData.password && editFormData.password.trim().length > 0) {
+                        data.append('password', editFormData.password.trim());
+                    }
+                } else if (editFormData[key] !== null && editFormData[key] !== undefined) {
                     data.append(key, editFormData[key]);
                 }
             });
@@ -475,6 +639,7 @@ export default function SuperAdminDashboard() {
 
         fetchGlobalData(true);
         fetchTenants();
+        fetchSaasPlans();
         const interval = setInterval(() => fetchGlobalData(false), 300000); // 5 min
         return () => { mounted = false; clearInterval(interval); };
     }, []);
@@ -571,6 +736,186 @@ export default function SuperAdminDashboard() {
                         icon={Briefcase}
                         colorClass="bg-cyan-500 text-cyan-100"
                     />
+                </section>
+
+                {/* SaaS Subscription Plans Management Section */}
+                <section className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden">
+                    <div className="px-6 py-5 border-b border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-purple-50/40 to-slate-50 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-xs">
+                                <Layers size={18} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-lg font-bold text-gray-900">SaaS Subscription Plans</h3>
+                                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                        Super Admin Control
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                    Configure pricing, room limits, features, and badges for Starter, Growth, Enterprise, and Trial plans
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={fetchSaasPlans}
+                                disabled={plansLoading}
+                                className="px-3.5 py-1.5 bg-white hover:bg-gray-50 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+                            >
+                                <RotateCcw size={13} className={plansLoading ? "animate-spin" : ""} /> Refresh Plans
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="p-5 sm:p-6 bg-slate-50/60">
+                        {plansLoading && saasPlans.length === 0 ? (
+                            <div className="py-12 flex flex-col items-center justify-center text-gray-400">
+                                <Loader2 className="animate-spin text-indigo-600 mb-2" size={28} />
+                                <span className="text-xs font-semibold">Loading subscription plans...</span>
+                            </div>
+                        ) : saasPlans.length === 0 ? (
+                            <div className="text-center py-8 text-sm text-gray-500">
+                                No SaaS plans found in database.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+                                {saasPlans.map((plan) => {
+                                    const isStarter = plan.code === "starter";
+                                    const isGrowth = plan.code === "growth";
+                                    const isEnterprise = plan.code === "enterprise";
+
+                                    return (
+                                        <div
+                                            key={plan.id}
+                                            className={`rounded-2xl p-5 relative flex flex-col justify-between transition-all bg-white border shadow-xs hover:shadow-md ${
+                                                isGrowth
+                                                    ? "border-indigo-300 ring-2 ring-indigo-500/10"
+                                                    : isStarter
+                                                    ? "border-emerald-200"
+                                                    : isEnterprise
+                                                    ? "border-purple-200"
+                                                    : "border-gray-200"
+                                            }`}
+                                        >
+                                            {/* Ribbon/Badge */}
+                                            {plan.badge && (
+                                                <div className="absolute -top-2.5 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-xs bg-amber-400 text-amber-950">
+                                                    {plan.badge}
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-3">
+                                                {/* Header & Code */}
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-md ${
+                                                        isGrowth
+                                                            ? "bg-indigo-100 text-indigo-800"
+                                                            : isStarter
+                                                            ? "bg-emerald-100 text-emerald-800"
+                                                            : isEnterprise
+                                                            ? "bg-purple-100 text-purple-800"
+                                                            : "bg-gray-100 text-gray-700"
+                                                    }`}>
+                                                        {plan.code}
+                                                    </span>
+                                                    <span className={`text-[10px] font-semibold flex items-center gap-1 ${
+                                                        plan.is_active ? "text-emerald-600" : "text-gray-400"
+                                                    }`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${plan.is_active ? "bg-emerald-500" : "bg-gray-400"}`}></span>
+                                                        {plan.is_active ? "Active" : "Disabled"}
+                                                    </span>
+                                                </div>
+
+                                                {/* Plan Name & Price */}
+                                                <div>
+                                                    <h4 className="text-base font-extrabold text-gray-900 leading-tight">
+                                                        {plan.name}
+                                                    </h4>
+                                                    <div className="flex items-baseline gap-1 mt-1">
+                                                        <span className="text-2xl font-black text-gray-900">
+                                                            {plan.price_monthly > 0
+                                                                ? `₹${plan.price_monthly.toLocaleString()}`
+                                                                : isEnterprise
+                                                                ? "Custom"
+                                                                : "Free"}
+                                                        </span>
+                                                        <span className="text-xs text-gray-400 font-medium">
+                                                            {plan.price_monthly > 0 ? "/ month" : isEnterprise ? "/ tailored" : ""}
+                                                        </span>
+                                                    </div>
+                                                    {plan.description && (
+                                                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                                            {plan.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* Quotas & Limits Grid */}
+                                                <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                                                    <div>
+                                                        <span className="text-[10px] text-gray-400 block font-medium">Max Rooms</span>
+                                                        <span className="font-bold text-gray-800">
+                                                            {plan.max_rooms >= 999 ? "Unlimited" : `${plan.max_rooms} Rooms`}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-gray-400 block font-medium">Max Branches</span>
+                                                        <span className="font-bold text-gray-800">
+                                                            {plan.max_branches >= 99 ? "Unlimited" : `${plan.max_branches} Branch`}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-gray-400 block font-medium">Staff Users</span>
+                                                        <span className="font-bold text-gray-800">
+                                                            {plan.max_staff_users >= 999 ? "Unlimited" : `${plan.max_staff_users} Users`}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-gray-400 block font-medium">Subscribers</span>
+                                                        <span className="font-bold text-indigo-600">
+                                                            {plan.subscriber_count || 0} Properties
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Features Preview */}
+                                                <div className="pt-2 border-t border-gray-100 space-y-1.5">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                                                        Features ({Array.isArray(plan.features) ? plan.features.length : 0})
+                                                    </span>
+                                                    <ul className="space-y-1 text-xs text-gray-600">
+                                                        {(Array.isArray(plan.features) ? plan.features.slice(0, 3) : []).map((feat, idx) => (
+                                                            <li key={idx} className="flex items-center gap-1.5 truncate" title={feat}>
+                                                                <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                                                                <span className="truncate">{feat}</span>
+                                                            </li>
+                                                        ))}
+                                                        {Array.isArray(plan.features) && plan.features.length > 3 && (
+                                                            <li className="text-[11px] text-indigo-600 font-semibold pl-4">
+                                                                +{plan.features.length - 3} more features
+                                                            </li>
+                                                        )}
+                                                    </ul>
+                                                </div>
+                                            </div>
+
+                                            {/* Action Button */}
+                                            <div className="pt-4 mt-3 border-t border-gray-100">
+                                                <button
+                                                    onClick={() => handleOpenEditPlanModal(plan)}
+                                                    className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 group"
+                                                >
+                                                    <Edit2 size={13} className="group-hover:scale-110 transition-transform" />
+                                                    <span>Edit {plan.name}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </section>
 
                 {/* Property Approvals Section */}
@@ -722,8 +1067,9 @@ export default function SuperAdminDashboard() {
                                     <tr>
                                         <th className="px-5 py-4">Property / Business</th>
                                         <th className="px-5 py-4">Owner</th>
-                                        <th className="px-5 py-4">Aiosell Hotel Code</th>
+                                        <th className="px-5 py-4">Hotel Code</th>
                                         <th className="px-5 py-4">Plan</th>
+                                        <th className="px-5 py-4">Payment</th>
                                         <th className="px-5 py-4">Status</th>
                                         <th className="px-5 py-4">Action</th>
                                     </tr>
@@ -763,6 +1109,52 @@ export default function SuperAdminDashboard() {
                                             </td>
                                             <td className="px-5 py-4 capitalize text-gray-600">{tenant.plan_code || tenant.plan_name || 'starter'}</td>
                                             <td className="px-5 py-4">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="font-bold text-gray-900 text-xs">
+                                                        ₹{(tenant.monthly_amount || 0).toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">/ mo</span>
+                                                    </span>
+                                                    <div>
+                                                        {tenant.payment_status === 'paid' ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                                                ✅ Paid
+                                                            </span>
+                                                        ) : tenant.payment_status === 'payment_raised' ? (
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
+                                                                    ⚡ Payment Raised
+                                                                </span>
+                                                                {tenant.payment_ref && (
+                                                                    <span className="text-[10px] font-mono text-gray-600 truncate max-w-[130px]" title={`UTR: ${tenant.payment_ref}`}>
+                                                                        UTR: {tenant.payment_ref}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                                                                ⚠️ Not Raised
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {tenant.expiry_date && (
+                                                        <div className={`flex items-center gap-1 text-[10px] font-medium mt-0.5 ${
+                                                            tenant.is_overdue
+                                                                ? "text-rose-600 font-bold"
+                                                                : tenant.is_due_soon
+                                                                ? "text-amber-700 font-bold"
+                                                                : "text-gray-500"
+                                                        }`} title={`Billing Due Date: ${tenant.next_billing_date}`}>
+                                                            <Calendar size={11} className="shrink-0" />
+                                                            <span>Due: {tenant.expiry_date}</span>
+                                                            {tenant.days_until_due !== null && tenant.days_until_due !== undefined && (
+                                                                <span className="text-[9px] font-mono">
+                                                                    ({tenant.is_overdue ? `${Math.abs(tenant.days_until_due)}d overdue` : tenant.days_until_due === 0 ? "Today" : `${tenant.days_until_due}d left`})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-4">
                                                 {tenant.subscription_status === 'pending_approval' ? (
                                                     <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
                                                         <Clock size={12} /> Pending Approval
@@ -778,14 +1170,47 @@ export default function SuperAdminDashboard() {
                                                 )}
                                             </td>
                                             <td className="px-5 py-4">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
                                                     <button
                                                         onClick={() => handleOpenEditModal(tenant)}
-                                                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                                                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
                                                         title="Edit property details, code, and address"
                                                     >
                                                         <Edit2 size={12} /> Edit
                                                     </button>
+                                                    {tenant.payment_status === 'payment_raised' ? (
+                                                        <button
+                                                            onClick={() => handleAcceptPayment(tenant, 'paid')}
+                                                            disabled={acceptingPaymentId === tenant.id}
+                                                            className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 text-white text-xs font-extrabold rounded-lg transition-all flex items-center gap-1.5 shadow-sm hover:shadow ring-2 ring-emerald-400/50"
+                                                            title={`Accept payment of ₹${tenant.monthly_amount || 2500} (UTR: ${tenant.payment_ref || 'N/A'}) and activate property`}
+                                                        >
+                                                            {acceptingPaymentId === tenant.id ? (
+                                                                <><Loader2 className="animate-spin" size={12} /> Confirming...</>
+                                                            ) : (
+                                                                <><CreditCard size={12} /> Accept Payment</>
+                                                            )}
+                                                        </button>
+                                                    ) : tenant.payment_status === 'paid' ? (
+                                                        <button
+                                                            onClick={() => handleAcceptPayment(tenant, 'unpaid')}
+                                                            disabled={acceptingPaymentId === tenant.id}
+                                                            className="px-2.5 py-1.5 bg-gray-50 hover:bg-rose-50 text-gray-500 hover:text-rose-700 text-[11px] font-semibold rounded-lg transition-colors border border-gray-200"
+                                                            title="Revert payment status to unpaid"
+                                                        >
+                                                            Mark Unpaid
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleAcceptPayment(tenant, 'paid')}
+                                                            disabled={acceptingPaymentId === tenant.id}
+                                                            className="px-2.5 py-1.5 bg-gray-100 hover:bg-amber-50 text-gray-400 hover:text-amber-800 border border-gray-200 hover:border-amber-300 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 shadow-xs"
+                                                            title="Payment not raised by property yet. Click to manually raise and accept payment on their behalf."
+                                                        >
+                                                            <CreditCard size={12} className="text-gray-400" />
+                                                            <span className="text-[11px]">Raise &amp; Accept</span>
+                                                        </button>
+                                                    )}
                                                     {tenant.subscription_status === 'pending_approval' ? (
                                                         <button
                                                             onClick={() => handleApproveTenant(tenant.id)}
@@ -860,7 +1285,7 @@ export default function SuperAdminDashboard() {
                                 type="text"
                                 value={branchSearch}
                                 onChange={(e) => setBranchSearch(e.target.value)}
-                                placeholder="Search branch name, aiosell code, location, GST..."
+                                placeholder="Search branch name, hotel code, location, GST..."
                                 className="w-full pl-10 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all text-gray-800 placeholder-gray-400 shadow-sm"
                             />
                             {branchSearch && (
@@ -931,7 +1356,7 @@ export default function SuperAdminDashboard() {
                                 <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-100">
                                     <tr>
                                         <th className="px-6 py-4">Branch Name</th>
-                                        <th className="px-6 py-4">Aiosell Code</th>
+                                        <th className="px-6 py-4">Hotel Code</th>
                                         <th className="px-6 py-4">Location</th>
                                         <th className="px-6 py-4">GST Number</th>
                                         <th className="px-6 py-4">Status</th>
@@ -1011,7 +1436,7 @@ export default function SuperAdminDashboard() {
                                         Edit Property Details
                                     </h2>
                                     <p className="text-xs text-gray-500 mt-1 font-medium">
-                                        Update property configuration, Aiosell hotel sync code, and contact information
+                                        Update property configuration, hotel sync code, and contact information
                                     </p>
                                 </div>
                                 <button
@@ -1087,7 +1512,7 @@ export default function SuperAdminDashboard() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-600 mb-1">
-                                                Aiosell Hotel / Branch Code <span className="text-rose-500">*</span>
+                                                Hotel / Branch Code <span className="text-rose-500">*</span>
                                             </label>
                                             <div className="relative">
                                                 <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
@@ -1101,7 +1526,7 @@ export default function SuperAdminDashboard() {
                                                 />
                                             </div>
                                             <p className="text-[11px] text-gray-400 mt-1">
-                                                Required for Aiosell OTA Channel Manager synchronization.
+                                                Required for OTA Channel Manager synchronization.
                                             </p>
                                         </div>
                                         <div>
@@ -1150,6 +1575,64 @@ export default function SuperAdminDashboard() {
                                                 className="w-full px-3.5 py-2 text-sm font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all"
                                                 placeholder="e.g. 32BLUPS54887K1Z1"
                                             />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center justify-between">
+                                                <span>Admin Account Password</span>
+                                                <span className="text-[10px] text-gray-400 font-normal">Leave blank to keep unchanged</span>
+                                            </label>
+                                            <div className="relative">
+                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                                    <Lock size={15} />
+                                                </div>
+                                                <input
+                                                    type={showEditPassword ? "text" : "password"}
+                                                    value={editFormData.password || ''}
+                                                    onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
+                                                    className="w-full pl-9 pr-10 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400"
+                                                    placeholder="Enter new admin password"
+                                                    autoComplete="new-password"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowEditPassword(!showEditPassword)}
+                                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                                                    tabIndex={-1}
+                                                >
+                                                    {showEditPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Subscription & Payment Status */}
+                                    <div className="col-span-1 md:col-span-2 space-y-3 pt-3 border-t border-gray-100">
+                                        <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1.5">
+                                            <CreditCard size={14} /> Subscription &amp; Payment Status
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-600 mb-1">Payment Status</label>
+                                                <select
+                                                    value={editFormData.payment_status}
+                                                    onChange={(e) => setEditFormData({ ...editFormData, payment_status: e.target.value })}
+                                                    className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all font-semibold"
+                                                >
+                                                    <option value="paid">✅ Paid (Active Subscription)</option>
+                                                    <option value="unpaid">⚠️ Unpaid / Due</option>
+                                                    <option value="overdue">❌ Overdue</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-600 mb-1">Monthly Subscription Fee (₹)</label>
+                                                <input
+                                                    type="number"
+                                                    value={editFormData.monthly_amount}
+                                                    onChange={(e) => setEditFormData({ ...editFormData, monthly_amount: parseFloat(e.target.value) || 0 })}
+                                                    className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all font-bold"
+                                                    placeholder="2500"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1237,6 +1720,241 @@ export default function SuperAdminDashboard() {
                                             <>
                                                 <CheckCircle size={16} />
                                                 Save Changes
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit SaaS Plan Modal */}
+                {isPlanModalOpen && editingPlan && (
+                    <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto border border-gray-100 p-6 md:p-8">
+                            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shadow-xs">
+                                        <Layers size={22} />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-lg font-bold text-gray-900">Edit {editingPlan.name}</h3>
+                                            <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800">
+                                                {editingPlan.code}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            Modify pricing, room and user quotas, features, and marketing badges
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setIsPlanModalOpen(false)}
+                                    className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSavePlan} className="space-y-5 pt-5">
+                                {/* Plan Name & Code */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Plan Display Name *</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={planFormData.name}
+                                            onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
+                                            className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all font-semibold"
+                                            placeholder="e.g. Starter Plan"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">System Code</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                disabled
+                                                value={planFormData.code}
+                                                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-500 font-mono font-bold uppercase cursor-not-allowed"
+                                            />
+                                            <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Pricing */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Monthly Subscription Fee (₹) *</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                required
+                                                value={planFormData.price_monthly}
+                                                onChange={(e) => setPlanFormData({ ...planFormData, price_monthly: e.target.value })}
+                                                className="w-full pl-8 pr-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all font-black text-gray-900 bg-white"
+                                                placeholder="2500"
+                                            />
+                                        </div>
+                                        <span className="text-[10px] text-gray-400 mt-1 block">Set 0 for Custom / Free plans</span>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Yearly Subscription Fee (₹)</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                value={planFormData.price_yearly}
+                                                onChange={(e) => setPlanFormData({ ...planFormData, price_yearly: e.target.value })}
+                                                className="w-full pl-8 pr-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all font-black text-gray-900 bg-white"
+                                                placeholder="25000"
+                                            />
+                                        </div>
+                                        <span className="text-[10px] text-gray-400 mt-1 block">Optional discounted annual billing</span>
+                                    </div>
+                                </div>
+
+                                {/* Quotas / Limits */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Max Rooms Limit</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={planFormData.max_rooms}
+                                            onChange={(e) => setPlanFormData({ ...planFormData, max_rooms: e.target.value })}
+                                            className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all font-semibold"
+                                            placeholder="15"
+                                        />
+                                        <span className="text-[10px] text-gray-400 mt-0.5 block">Use 999 for unlimited</span>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Max Branches</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={planFormData.max_branches}
+                                            onChange={(e) => setPlanFormData({ ...planFormData, max_branches: e.target.value })}
+                                            className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all font-semibold"
+                                            placeholder="1"
+                                        />
+                                        <span className="text-[10px] text-gray-400 mt-0.5 block">Use 99 for chain networks</span>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Staff User Accounts</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={planFormData.max_staff_users}
+                                            onChange={(e) => setPlanFormData({ ...planFormData, max_staff_users: e.target.value })}
+                                            className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all font-semibold"
+                                            placeholder="5"
+                                        />
+                                        <span className="text-[10px] text-gray-400 mt-0.5 block">Use 999 for unlimited</span>
+                                    </div>
+                                </div>
+
+                                {/* Marketing Badge & Tagline */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Badge / Ribbon Text</label>
+                                        <input
+                                            type="text"
+                                            value={planFormData.badge}
+                                            onChange={(e) => setPlanFormData({ ...planFormData, badge: e.target.value })}
+                                            className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all"
+                                            placeholder="e.g. 10-15 Rooms, Most Popular, Unlimited"
+                                        />
+                                        <span className="text-[10px] text-gray-400 mt-0.5 block">Highlight pill shown above or beside card</span>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Tagline / Short Description</label>
+                                        <input
+                                            type="text"
+                                            value={planFormData.description}
+                                            onChange={(e) => setPlanFormData({ ...planFormData, description: e.target.value })}
+                                            className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all"
+                                            placeholder="e.g. Ideal for boutique resorts and homestays"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Features List */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-xs font-bold text-gray-700">Plan Features &amp; Inclusions</label>
+                                        <span className="text-[11px] text-indigo-600 font-semibold">1 feature bullet per line</span>
+                                    </div>
+                                    <textarea
+                                        rows={5}
+                                        value={planFormData.features}
+                                        onChange={(e) => setPlanFormData({ ...planFormData, features: e.target.value })}
+                                        className="w-full px-3.5 py-2.5 text-xs font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all"
+                                        placeholder="Up to 15 Rooms Management&#10;Unlimited Guest Bookings &amp; Check-ins&#10;POS &amp; Food Order System&#10;QR Digital Menu for Guests&#10;WhatsApp Payment Support"
+                                    />
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                        Enter each feature on a separate line. Properties will see these bullet points on their subscription page.
+                                    </p>
+                                </div>
+
+                                {/* Toggles */}
+                                <div className="space-y-2 pt-2 border-t border-gray-100">
+                                    <label className="flex items-center gap-2.5 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={planFormData.is_active}
+                                            onChange={(e) => setPlanFormData({ ...planFormData, is_active: e.target.checked })}
+                                            className="w-4 h-4 text-indigo-600 rounded-md border-gray-300 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-xs font-bold text-gray-700">Plan is Active &amp; Available for Properties</span>
+                                    </label>
+
+                                    <label className="flex items-center gap-2.5 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={planFormData.update_existing_tenants}
+                                            onChange={(e) => setPlanFormData({ ...planFormData, update_existing_tenants: e.target.checked })}
+                                            className="w-4 h-4 text-indigo-600 rounded-md border-gray-300 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-xs font-medium text-gray-600">
+                                            Also update monthly billing fee for current properties subscribed to this plan
+                                        </span>
+                                    </label>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center justify-end gap-3 pt-5 border-t border-gray-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPlanModalOpen(false)}
+                                        disabled={savingPlan}
+                                        className="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={savingPlan}
+                                        className="px-7 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl hover:shadow-lg transition-all font-bold text-sm flex items-center justify-center gap-2 shadow-md disabled:opacity-70"
+                                    >
+                                        {savingPlan ? (
+                                            <>
+                                                <Loader2 className="animate-spin" size={16} />
+                                                Saving Plan...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle size={16} />
+                                                Save Plan
                                             </>
                                         )}
                                     </button>

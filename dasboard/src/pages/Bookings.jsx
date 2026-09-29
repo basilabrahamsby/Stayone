@@ -6241,7 +6241,7 @@ const Bookings = () => {
     const displayId = generateBookingId(b);
     if (
       !window.confirm(
-        `Are you sure you want to mark booking ${displayId} (${b.guest_name || "Guest"}) as NO SHOW?\n\nThis will update status to No Show, release physical room availability, and notify Aiosell Channel Manager.`
+        `Are you sure you want to mark booking ${displayId} (${b.guest_name || "Guest"}) as NO SHOW?\n\nThis will update status to No Show, release physical room availability, and notify Channel Manager.`
       )
     )
       return;
@@ -6253,7 +6253,7 @@ const Bookings = () => {
       );
       showBannerMessage(
         "success",
-        `Booking ${displayId} marked as No Show successfully! ${response.data?.aiosell_pushed ? "(Synced with Aiosell)" : ""}`
+        `Booking ${displayId} marked as No Show successfully! ${response.data?.aiosell_pushed ? "(Synced with Channel Manager)" : ""}`
       );
       setBookings((prevBookings) =>
         prevBookings.map((item) =>
@@ -7269,7 +7269,7 @@ const Bookings = () => {
                                    <button
                                      onClick={() => markNoShowBooking(b)}
                                      className="w-10 h-10 bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white rounded-xl border-2 border-amber-300 hover:border-amber-600 transition-all shadow-md flex items-center justify-center font-bold"
-                                     title="Mark No-Show (Sync Aiosell)"
+                                     title="Mark No-Show (Sync Channel Manager)"
                                    >
                                      <UserX className="w-5 h-5" />
                                    </button>

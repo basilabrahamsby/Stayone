@@ -3478,7 +3478,9 @@ def get_asset_mappings(
     real_mappings = mapping_query.all()
     
     # 2. Fetch Location Stock
-    stock_query = db.query(LocationStock).filter(LocationStock.branch_id == branch_id).join(InventoryItem).join(Location)
+    stock_query = db.query(LocationStock).join(InventoryItem).join(Location)
+    if branch_id is not None:
+        stock_query = stock_query.filter(LocationStock.branch_id == branch_id)
 
     if location_id:
         stock_query = stock_query.filter(LocationStock.location_id == location_id)
@@ -4091,9 +4093,10 @@ def get_all_recipes_endpoint(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
-    recipes = inventory_crud.get_all_recipes(db, skip=skip, limit=limit)
+    recipes = inventory_crud.get_all_recipes(db, skip=skip, limit=limit, branch_id=branch_id)
     result = []
     for r in recipes:
         result.append({
@@ -4121,11 +4124,14 @@ def get_asset_registry(
     limit: int = 100,
     active_only: bool = True,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    branch_id: Optional[int] = Depends(get_branch_id)
 ):
     from app.models.inventory import AssetRegistry
     
-    query = db.query(AssetRegistry).filter(AssetRegistry.branch_id == branch_id)
+    query = db.query(AssetRegistry)
+    if branch_id is not None:
+        query = query.filter(AssetRegistry.branch_id == branch_id)
     if active_only:
         query = query.filter(AssetRegistry.status != 'written_off')
         

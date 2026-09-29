@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.database import SessionLocal
-from app.schemas.auth import LoginRequest, Token
+from app.schemas.auth import LoginRequest, Token, ChangePasswordRequest
 from app.utils import auth
 from app.curd import user as crud_user
 from fastapi import Depends
@@ -29,27 +29,38 @@ def login(request: LoginRequest, db: Session = Depends(auth.get_db)):
             print(f"Login attempt: User {request.email} is inactive")
             raise HTTPException(status_code=400, detail="Account is inactive. Please contact administrator.")
         
-        # Check if user's property/tenant workspace has been disabled
+        # Check if user's property/tenant workspace has been approved and is active
         if getattr(user, 'tenant_id', None) and not getattr(user, 'is_superadmin', False):
             from app.models.tenant import Tenant
             tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
-            if tenant and not tenant.is_active:
-                print(f"Login attempt: Property '{tenant.name}' is disabled")
-                raise HTTPException(status_code=403, detail=f"The property workspace '{tenant.name}' has been disabled by platform administration. Please contact support.")
+            if tenant:
+                if tenant.subscription_status == "pending_approval" or not tenant.is_active:
+                    print(f"Login attempt blocked: Property '{tenant.name}' is pending approval or inactive")
+                    raise HTTPException(
+                        status_code=403, 
+                        detail=f"Your property '{tenant.name}' registration is pending approval / payment confirmation by Super Admin. You will be able to log in once Super Admin accepts your property."
+                    )
         
-        # Check if user's branch has been disabled
+        # Check if user's branch has been approved and is active
         if getattr(user, 'branch_id', None) and not getattr(user, 'is_superadmin', False):
             from app.models.branch import Branch
             from app.models.tenant import Tenant
             user_branch = db.query(Branch).filter(Branch.id == user.branch_id).first()
-            if not user_branch or not user_branch.is_active:
-                print(f"Login attempt: Branch '{user_branch.name if user_branch else user.branch_id}' is disabled")
-                raise HTTPException(status_code=403, detail=f"Access denied: Branch '{user_branch.name if user_branch else user.branch_id}' has been disabled by platform administration. Please contact support.")
-            if user_branch.tenant_id:
+            if user_branch and user_branch.tenant_id:
                 branch_tenant = db.query(Tenant).filter(Tenant.id == user_branch.tenant_id).first()
-                if branch_tenant and not branch_tenant.is_active:
-                    print(f"Login attempt: Property '{branch_tenant.name}' is disabled")
-                    raise HTTPException(status_code=403, detail=f"The property workspace '{branch_tenant.name}' has been disabled by platform administration. Please contact support.")
+                if branch_tenant:
+                    if branch_tenant.subscription_status == "pending_approval" or not branch_tenant.is_active:
+                        print(f"Login attempt blocked: Property '{branch_tenant.name}' is pending approval or inactive")
+                        raise HTTPException(
+                            status_code=403, 
+                            detail=f"Your property '{branch_tenant.name}' registration is pending approval / payment confirmation by Super Admin. You will be able to log in once Super Admin accepts your property."
+                        )
+            if not user_branch or not user_branch.is_active:
+                print(f"Login attempt blocked: Branch '{user_branch.name if user_branch else user.branch_id}' is inactive/disabled")
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Access denied: Property branch '{user_branch.name if user_branch else user.branch_id}' is pending activation by Super Admin. Please contact support or await approval."
+                )
 
         # Check if user has a role
         if not user.role:
@@ -165,6 +176,32 @@ def admin_data(user=Depends(get_current_user)):
     if user.role.name != "admin":
         raise HTTPException(status_code=403, detail="Forbidden")
     return {"message": "Admin access granted"}
+
+
+@router.post("/change-password")
+def change_password(
+    request: ChangePasswordRequest,
+    user=Depends(get_current_user),
+    db: Session = Depends(auth.get_db)
+):
+    """Change password for the currently authenticated user"""
+    if not request.new_password or len(request.new_password.strip()) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters long")
+    
+    cur_pwd = request.current_password or request.old_password
+    # If not superadmin, require and verify the current password
+    if not getattr(user, 'is_superadmin', False):
+        if not cur_pwd:
+            raise HTTPException(status_code=400, detail="Current password is required")
+        if not auth.verify_password(cur_pwd, user.hashed_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+    elif cur_pwd:
+        if not auth.verify_password(cur_pwd, user.hashed_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    user.hashed_password = auth.get_password_hash(request.new_password.strip())
+    db.commit()
+    return {"success": True, "message": "Password changed successfully"}
 
 
 

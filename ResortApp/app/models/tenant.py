@@ -55,6 +55,7 @@ class Tenant(Base):
     last_billed_at = Column(DateTime, nullable=True)
     next_billing_date = Column(DateTime, nullable=True)
     billing_cycle = Column(String, default="monthly")
+    monthly_amount = Column(Float, nullable=True, default=0.0)
     payment_status = Column(String, default="unpaid") # unpaid, payment_raised, paid, overdue
     payment_ref = Column(String, nullable=True) # UTR or transaction ID
     payment_method = Column(String, nullable=True) # payment method used

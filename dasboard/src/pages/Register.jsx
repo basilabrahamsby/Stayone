@@ -65,7 +65,85 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [currency, setCurrency] = useState("INR");
-  const [selectedPlan, setSelectedPlan] = useState("starter"); // "starter" (10 rooms) or "growth" (30 rooms)
+  const [selectedPlan, setSelectedPlan] = useState("starter"); // "starter", "growth", "enterprise", or "trial"
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+
+  const defaultFallbackPlans = [
+    {
+      id: 1,
+      code: "starter",
+      name: "Starter",
+      price_monthly: 2999,
+      max_rooms: 25,
+      max_branches: 1,
+      max_staff_users: 10,
+      description: "Ideal for boutique resorts and homestays",
+      badge: "POPULAR"
+    },
+    {
+      id: 2,
+      code: "growth",
+      name: "Growth Pro",
+      price_monthly: 6999,
+      max_rooms: 75,
+      max_branches: 3,
+      max_staff_users: 30,
+      description: "For growing resorts and multi-branch properties",
+      badge: "MOST POPULAR"
+    },
+    {
+      id: 3,
+      code: "enterprise",
+      name: "Enterprise Chain",
+      price_monthly: 14999,
+      max_rooms: 9999,
+      max_branches: 999,
+      max_staff_users: 9999,
+      description: "For enterprise chains and large hotel groups",
+      badge: "ENTERPRISE"
+    },
+    {
+      id: 4,
+      code: "trial",
+      name: "14-Day Free Trial",
+      price_monthly: 0,
+      max_rooms: 20,
+      max_branches: 1,
+      max_staff_users: 10,
+      description: "Ideal for testing all features free of charge",
+      badge: "TRIAL"
+    }
+  ];
+
+  const displayedPlans = (plans && plans.length > 0) ? plans : defaultFallbackPlans;
+  const starterPlanObj = displayedPlans.find(p => p.code === "starter") || displayedPlans[0] || { price_monthly: 2999, max_rooms: 25 };
+  const starterPlanPrice = (starterPlanObj.price_monthly || 2999).toLocaleString();
+  const starterPlanRooms = starterPlanObj.max_rooms >= 999 ? "Unlimited" : (starterPlanObj.max_rooms || 25);
+
+  // Fetch active SaaS plans from API dynamically (synced with Super Admin Dashboard)
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPlans = async () => {
+      setPlansLoading(true);
+      try {
+        const res = await api.get("/saas/plans");
+        if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+          setPlans(res.data);
+          if (!selectedPlan || !res.data.some(p => p.code === selectedPlan)) {
+            const hasStarter = res.data.find(p => p.code === "starter");
+            setSelectedPlan(hasStarter ? "starter" : res.data[0].code);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load SaaS plans from API:", err);
+      } finally {
+        if (isMounted) setPlansLoading(false);
+      }
+    };
+    fetchPlans();
+    return () => { isMounted = false; };
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -260,6 +338,13 @@ export default function RegisterPage() {
                 👉 <strong className="text-indigo-950 font-bold">Pay at Teqmates and share screenshot</strong> to activate your property within minutes!
               </p>
               <div className="pt-2 border-t border-gray-100 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Selected Plan:</span>
+                  <span className="font-bold text-gray-800">
+                    {displayedPlans.find(p => p.code === selectedPlan)?.name || "Starter"}
+                    {registeredTenant?.monthly_amount > 0 ? ` (₹${(registeredTenant.monthly_amount).toLocaleString()}/mo)` : " (Free Trial)"}
+                  </span>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Payee:</span>
                   <span className="font-bold text-gray-800">Teqmates Technologies Pvt Ltd</span>
@@ -771,53 +856,60 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Plan Tier Selection: 10 Rooms vs 30 Rooms */}
+            {/* Plan Tier Selection: Dynamic SaaS Plans matching Admin Dashboard */}
             <div>
-              <label className="text-xs font-semibold text-gray-700 block mb-2">
-                Choose Resort Size & Plan
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {/* 10 Rooms Plan */}
-                <div
-                  onClick={() => setSelectedPlan("starter")}
-                  className={`cursor-pointer p-3.5 rounded-xl border-2 transition-all relative ${
-                    selectedPlan === "starter"
-                      ? "border-emerald-600 bg-emerald-50/60 shadow-sm"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-gray-900 text-sm">Up to 10 Rooms</span>
-                    {selectedPlan === "starter" && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-                    )}
-                  </div>
-                  <div className="text-emerald-700 font-extrabold text-base">
-                    ₹2,500 <span className="text-[11px] font-normal text-gray-500">/ month</span>
-                  </div>
-                  <div className="text-[10px] text-gray-500 mt-1">Ideal for Villas & Boutique Stays</div>
-                </div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-gray-700">
+                  Choose Resort Size & Plan
+                </label>
+                {plansLoading && (
+                  <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin" /> Syncing plans...
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {displayedPlans.map((plan) => {
+                  const isSelected = selectedPlan === plan.code;
+                  const roomText = plan.max_rooms >= 999 ? "Unlimited Rooms" : `Up to ${plan.max_rooms} Rooms`;
+                  const isFree = !plan.price_monthly || plan.price_monthly === 0;
 
-                {/* 30 Rooms Plan */}
-                <div
-                  onClick={() => setSelectedPlan("growth")}
-                  className={`cursor-pointer p-3.5 rounded-xl border-2 transition-all relative ${
-                    selectedPlan === "growth"
-                      ? "border-emerald-600 bg-emerald-50/60 shadow-sm"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-gray-900 text-sm">Up to 30 Rooms</span>
-                    {selectedPlan === "growth" && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-                    )}
-                  </div>
-                  <div className="text-emerald-700 font-extrabold text-base">
-                    ₹4,000 <span className="text-[11px] font-normal text-gray-500">/ month</span>
-                  </div>
-                  <div className="text-[10px] text-gray-500 mt-1">For Mid-Size Resorts & Lodges</div>
-                </div>
+                  return (
+                    <div
+                      key={plan.id || plan.code}
+                      onClick={() => setSelectedPlan(plan.code)}
+                      className={`cursor-pointer p-3 rounded-xl border-2 transition-all relative flex flex-col justify-between ${
+                        isSelected
+                          ? "border-emerald-600 bg-emerald-50/60 shadow-sm"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className="font-bold text-gray-900 text-xs truncate">{plan.name}</span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {plan.badge && (
+                              <span className="px-1.5 py-0.5 text-[9px] font-extrabold uppercase rounded bg-amber-100 text-amber-800">
+                                {plan.badge}
+                              </span>
+                            )}
+                            {isSelected && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-emerald-700 font-extrabold text-base">
+                          {isFree ? "Free" : `₹${plan.price_monthly.toLocaleString()}`}
+                          {!isFree && <span className="text-[11px] font-normal text-gray-500"> / mo</span>}
+                        </div>
+                      </div>
+                      <div className="mt-1.5 pt-1.5 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500">
+                        <span className="font-medium text-gray-700">{roomText}</span>
+                        <span>{plan.max_branches >= 999 ? "Unlimited Br." : plan.max_branches > 1 ? `${plan.max_branches} Branches` : "1 Branch"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -881,7 +973,7 @@ export default function RegisterPage() {
             The Complete Operating System for Modern Resorts
           </h2>
           <p className="mt-4 text-slate-300 max-w-lg text-base font-light leading-relaxed">
-            Tailor-made for independent resorts and villas. Starting at <strong>₹2,500/month for up to 10 rooms</strong> and <strong>₹4,000/month for up to 30 rooms</strong> with zero setup fees.
+            Tailor-made for independent resorts, luxury villas, and multi-property chains. Starting at <strong>₹{starterPlanPrice}/month for up to {starterPlanRooms} rooms</strong> with zero setup fees.
           </p>
         </div>
 

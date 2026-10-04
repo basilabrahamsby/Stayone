@@ -878,25 +878,69 @@ def create_purchase(
     print(f"  Destination Location ID: {purchase.destination_location_id}")
     print(f"  Details count: {len(purchase.details)}")
     
-    # 1. Handle auto-assign destination location BEFORE creating the master
-    # This ensures the record is created with the correct location ID initially
-    if purchase.status.lower() == "received" and not purchase.destination_location_id:
-        from app.models.inventory import Location
-        # Try to find a default warehouse location
-        default_location = db.query(Location).filter(
-            Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE"]),
-            (Location.branch_id == branch_id if branch_id is not None else True)
+    # 1. MANDATORY RULE: Before creating a purchase, at least one Main Inventory is mandatory
+    from app.models.inventory import Location
+    from sqlalchemy import or_, func
+
+    effective_branch_id = branch_id
+    if (not effective_branch_id or str(effective_branch_id).lower() == "all") and purchase.destination_location_id:
+        loc = db.query(Location).filter(Location.id == purchase.destination_location_id).first()
+        if loc:
+            effective_branch_id = loc.branch_id
+
+    # Check for at least one active Main Inventory (warehouse / central store / inventory point)
+    main_inv_query = db.query(Location).filter(
+        Location.is_active == True,
+        or_(
+            Location.is_inventory_point == True,
+            func.upper(Location.location_type).in_(["MAIN_INVENTORY", "WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE", "SUB_STORE"]),
+            func.lower(Location.name).like("%main inventory%"),
+            func.lower(Location.name).like("%main warehouse%"),
+            func.lower(Location.name).like("%central store%"),
+            func.lower(Location.name).like("%central warehouse%"),
+            func.lower(Location.name).like("%main store%")
+        )
+    )
+    if effective_branch_id and str(effective_branch_id).lower() != "all":
+        main_inv_query = main_inv_query.filter(Location.branch_id == effective_branch_id)
+
+    main_inventories = main_inv_query.all()
+    if not main_inventories:
+        raise HTTPException(
+            status_code=400,
+            detail="Before creating a purchase, at least one Main Inventory is mandatory. Please configure a Main Inventory (Warehouse / Central Store) location for this branch first."
+        )
+
+    # Validate destination location if provided, or auto-assign the branch's primary Main Inventory
+    if purchase.destination_location_id:
+        dest_loc = db.query(Location).filter(
+            Location.id == purchase.destination_location_id,
+            Location.is_active == True
         ).first()
-        
-        if not default_location:
+        if not dest_loc:
             raise HTTPException(
                 status_code=400,
-                detail="Cannot receive purchase without a destination location. Please create a warehouse location first or specify one in the purchase."
+                detail="Selected destination location does not exist or is inactive."
             )
-        
-        # Auto-assign the default location to the schema before CRUD creation
-        purchase.destination_location_id = default_location.id
-        print(f"[AUTO-ASSIGN] No destination location specified in request. Using default warehouse: {default_location.name} (ID: {default_location.id})")
+        if effective_branch_id and str(effective_branch_id).lower() != "all" and dest_loc.branch_id != effective_branch_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected destination location does not belong to the active branch."
+            )
+    else:
+        # Auto-assign the primary Main Inventory
+        primary_inv = None
+        for inv in main_inventories:
+            inv_name = (inv.name or "").lower()
+            inv_type = (inv.location_type or "").upper()
+            if "main" in inv_name or inv_type in ["MAIN_INVENTORY", "CENTRAL_WAREHOUSE"]:
+                primary_inv = inv
+                break
+        if not primary_inv:
+            primary_inv = main_inventories[0]
+
+        purchase.destination_location_id = primary_inv.id
+        print(f"[AUTO-ASSIGN] No destination location specified in request. Using Main Inventory: {primary_inv.name} (ID: {primary_inv.id})")
 
     # 2. Create the master record
     created = inventory_crud.create_purchase_master(db, purchase, branch_id=branch_id, created_by=current_user.id)

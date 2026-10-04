@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState, useCallback, memo } from "react";
+import { Link } from "react-router-dom";
 import { formatCurrency } from '../utils/currency';
 import { formatDateTimeIST } from "../utils/dateUtils";
 import API from "../services/api";
 import DashboardLayout from "../layout/DashboardLayout";
+import { CreditCard } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -673,8 +675,17 @@ const Dashboard = () => {
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Stayone Resort Admin Dashboard</h1>
             <p className="text-sm sm:text-base text-gray-500">Overview of bookings, rooms, revenue, expenses & operations</p>
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">
-            Last updated: {new Date().toLocaleString()}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              to="/subscription"
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-emerald-600/20 hover:shadow-lg transition-all hover:-translate-y-0.5"
+            >
+              <CreditCard size={15} />
+              <span>Monthly Bill & Plan</span>
+            </Link>
+            <div className="text-xs sm:text-sm text-gray-500">
+              Last updated: {new Date().toLocaleString()}
+            </div>
           </div>
         </header>
 

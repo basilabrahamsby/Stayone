@@ -1376,6 +1376,8 @@ def get_waste_log_by_id(db: Session, waste_log_id: int, branch_id: Optional[int]
 def generate_location_code(db: Session, location_type: str, room_area: str):
     """Generate location code like LOC-RM-101"""
     prefix_map = {
+        "MAIN_INVENTORY": "INV",
+        "Main Inventory": "INV",
         "GUEST_ROOM": "RM",
         "Guest Room": "RM",
         "WAREHOUSE": "WH",
@@ -1414,6 +1416,13 @@ def generate_location_code(db: Session, location_type: str, room_area: str):
 
 def create_location(db: Session, data: dict, branch_id: Optional[int] = 1):
     from app.models.inventory import Location
+    # Auto-enable is_inventory_point for warehouse and main inventory locations if not specified
+    loc_type = str(data.get("location_type", "")).upper()
+    if loc_type in ["MAIN_INVENTORY", "WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE"] and "is_inventory_point" not in data:
+        data["is_inventory_point"] = True
+    elif loc_type in ["MAIN_INVENTORY", "CENTRAL_WAREHOUSE"] and data.get("is_inventory_point") is None:
+        data["is_inventory_point"] = True
+
     location_code = generate_location_code(db, data.get("location_type", ""), data.get("room_area", ""))
     location = Location(
         location_code=location_code,

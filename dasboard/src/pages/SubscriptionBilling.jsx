@@ -403,6 +403,28 @@ export default function SubscriptionBilling() {
               </div>
             </div>
 
+            {isPaid ? (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
+                <CheckCircle2 size={18} className="text-emerald-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-extrabold text-emerald-900">Current Cycle: Verified &amp; Paid (₹{(billingInfo?.monthly_amount || 0).toLocaleString()})</p>
+                  <p className="text-[11px] text-emerald-700 mt-0.5">
+                    Your monthly subscription is active and verified by Super Admin. {billingInfo?.payment_ref ? `(Last Ref: ${billingInfo.payment_ref})` : ''}
+                  </p>
+                </div>
+              </div>
+            ) : isPaymentRaised ? (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 flex items-start gap-3">
+                <Clock size={18} className="text-amber-600 mt-0.5 shrink-0 animate-pulse" />
+                <div>
+                  <p className="text-xs font-extrabold text-amber-900">Payment Verification in Progress</p>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    Transaction Ref <span className="font-mono font-bold">{billingInfo?.payment_ref || "Submitted"}</span> is under review by Super Admin. Your workspace will remain active.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
             <form onSubmit={handleSubmitTransaction} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
@@ -527,6 +549,57 @@ export default function SubscriptionBilling() {
           </div>
         </div>
 
+        {/* Payment History & Verification Summary */}
+        <div className="bg-white p-6 md:p-7 rounded-3xl border border-gray-100 shadow-xs space-y-4">
+          <div className="flex items-center justify-between gap-3 pb-3 border-b border-gray-100 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Payment Verification &amp; Invoicing Details</h3>
+                <p className="text-xs text-gray-500">Record of current subscription cycle, transaction reference, and platform activation</p>
+              </div>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider ${
+              isPaid
+                ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                : isPaymentRaised
+                ? "bg-amber-100 text-amber-800 border border-amber-300"
+                : "bg-rose-100 text-rose-700 border border-rose-200"
+            }`}>
+              {isPaid ? "✅ Verified by Super Admin" : isPaymentRaised ? "⚡ Verification Pending" : "⚠️ Payment Overdue / Required"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-1">
+            <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Billing Amount</span>
+              <span className="text-base font-extrabold text-gray-900 mt-0.5 block">
+                ₹{(billingInfo?.monthly_amount || 0).toLocaleString()} <span className="text-xs font-normal text-gray-500">/ mo</span>
+              </span>
+            </div>
+            <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Recorded UTR / Ref</span>
+              <span className="text-sm font-mono font-bold text-indigo-700 mt-0.5 block truncate" title={billingInfo?.payment_ref || "None"}>
+                {billingInfo?.payment_ref || "Direct Bank / Advance"}
+              </span>
+            </div>
+            <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Payment Method</span>
+              <span className="text-sm font-semibold text-gray-800 mt-0.5 block truncate">
+                {billingInfo?.payment_method || "UPI (Teqmates)"}
+              </span>
+            </div>
+            <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Next Renewal / Expiry</span>
+              <span className="text-sm font-bold text-gray-900 mt-0.5 block">
+                {expiryDateFormatted || "Due Soon"}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Available SaaS Plans Grid */}
         <div className="space-y-4">
           <div>
@@ -540,44 +613,49 @@ export default function SubscriptionBilling() {
               : [
                   {
                     code: "starter",
-                    name: "Starter Plan",
-                    price_monthly: 2500,
-                    badge: "10-15 Rooms",
+                    name: "Starter",
+                    price_monthly: 2999,
+                    max_rooms: 25,
+                    badge: "POPULAR",
                     description: "Ideal for boutique resorts and homestays",
                     features: [
-                      "Up to 15 Rooms Management",
-                      "Unlimited Guest Bookings & Check-ins",
-                      "POS & Food Order System",
-                      "QR Digital Menu for Guests",
-                      "WhatsApp Payment Support"
+                      "Up to 25 Rooms Management",
+                      "1 Branch Location",
+                      "Up to 10 Staff Users",
+                      "Dashboard & Room Management",
+                      "Booking Engine & QR Menu",
+                      "Guest Portal & Basic Reports"
                     ]
                   },
                   {
                     code: "growth",
-                    name: "Growth Plan",
-                    price_monthly: 5000,
-                    badge: "Most Popular",
-                    description: "For expanding resorts needing OTA channel sync",
+                    name: "Growth Pro",
+                    price_monthly: 6999,
+                    max_rooms: 75,
+                    badge: "MOST POPULAR",
+                    description: "For growing resorts and multi-branch properties",
                     features: [
-                      "Everything in Starter",
+                      "Up to 75 Rooms Management",
+                      "Up to 3 Branches",
+                      "Up to 30 Staff Users",
                       "OTA Channel Manager 2-Way Sync",
-                      "Comprehensive Accounting & Ledger",
-                      "Full Inventory & Laundry Modules",
-                      "Multi-Staff User Accounts & Permissions"
+                      "POS, Food Orders & Inventory",
+                      "Comprehensive Reports"
                     ]
                   },
                   {
                     code: "enterprise",
-                    name: "Enterprise Plan",
-                    price_monthly: 0,
-                    badge: "Unlimited",
-                    description: "Multi-property chains & luxury resort networks",
+                    name: "Enterprise Chain",
+                    price_monthly: 14999,
+                    max_rooms: 9999,
+                    badge: "ENTERPRISE",
+                    description: "For enterprise chains and large hotel groups",
                     features: [
-                      "Unlimited Properties & Rooms",
-                      "Custom Domain / White Label Booking Portal",
-                      "Dedicated Key Account Manager",
-                      "24/7 Priority SLA & On-Site Training",
-                      "Custom Integrations & API Access"
+                      "Unlimited Rooms & Branches",
+                      "Unlimited Staff Users",
+                      "Multi-Property Command Center",
+                      "Custom Accounting & Ledger",
+                      "Dedicated Support & Custom Domain"
                     ]
                   }
                 ]

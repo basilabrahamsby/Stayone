@@ -2,7 +2,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
 import { formatCurrency } from '../utils/currency';
 import API from "../services/api";
-import { Building2, Users, Receipt, PiggyBank, Briefcase, Activity, CheckCircle, Clock, Shield, Hash, Ban, Power, Search, Filter, X, RotateCcw, Edit2, Camera, Upload, Loader2, Lock, Eye, EyeOff, CreditCard, Calendar, Layers, Sparkles, CheckCircle2, ChevronRight, Tag } from "lucide-react";
+import toast from "react-hot-toast";
+import { Building2, Users, Receipt, PiggyBank, Briefcase, Activity, CheckCircle, Clock, Shield, Hash, Ban, Power, Search, Filter, X, RotateCcw, Edit2, Camera, Upload, Loader2, Lock, Eye, EyeOff, CreditCard, Calendar, Layers, Sparkles, CheckCircle2, ChevronRight, Tag, Trash2, AlertCircle, AlertTriangle } from "lucide-react";
 
 // Premium styles imported
 import "../styles/premium-dashboard.css";
@@ -193,6 +194,96 @@ export default function SuperAdminDashboard() {
         setIsPlanModalOpen(true);
     };
 
+    // Premium Interactive Dialog State
+    const [dialogState, setDialogState] = useState({
+        isOpen: false,
+        type: 'success', // 'success' | 'danger' | 'warning' | 'info'
+        title: '',
+        message: '',
+        confirmText: 'Continue',
+        cancelText: 'Cancel',
+        inputValue: '',
+        inputLabel: '',
+        inputPlaceholder: '',
+        onConfirm: null,
+        onCancel: null,
+        isPrompt: false,
+        isConfirm: false
+    });
+
+    const showSuccessModal = (title, message) => {
+        toast.success(title);
+        setDialogState({
+            isOpen: true,
+            type: 'success',
+            title,
+            message,
+            confirmText: 'Awesome',
+            isConfirm: false,
+            isPrompt: false,
+            onConfirm: () => setDialogState(prev => ({ ...prev, isOpen: false }))
+        });
+    };
+
+    const showErrorModal = (title, message) => {
+        toast.error(title);
+        setDialogState({
+            isOpen: true,
+            type: 'danger',
+            title,
+            message: message || "An unexpected error occurred.",
+            confirmText: 'Dismiss',
+            isConfirm: false,
+            isPrompt: false,
+            onConfirm: () => setDialogState(prev => ({ ...prev, isOpen: false }))
+        });
+    };
+
+    const showConfirmModal = ({ title, message, type = 'warning', confirmText = 'Confirm', cancelText = 'Cancel', onConfirm, onCancel }) => {
+        setDialogState({
+            isOpen: true,
+            type,
+            title,
+            message,
+            confirmText,
+            cancelText,
+            isConfirm: true,
+            isPrompt: false,
+            onConfirm: () => {
+                setDialogState(prev => ({ ...prev, isOpen: false }));
+                if (onConfirm) onConfirm();
+            },
+            onCancel: () => {
+                setDialogState(prev => ({ ...prev, isOpen: false }));
+                if (onCancel) onCancel();
+            }
+        });
+    };
+
+    const showPromptModal = ({ title, message, inputLabel, defaultValue = '', placeholder = '', confirmText = 'Confirm', cancelText = 'Cancel', onConfirm, onCancel }) => {
+        setDialogState({
+            isOpen: true,
+            type: 'info',
+            title,
+            message,
+            inputLabel,
+            inputValue: defaultValue,
+            inputPlaceholder: placeholder,
+            confirmText,
+            cancelText,
+            isConfirm: true,
+            isPrompt: true,
+            onConfirm: (val) => {
+                setDialogState(prev => ({ ...prev, isOpen: false }));
+                if (onConfirm) onConfirm(val);
+            },
+            onCancel: () => {
+                setDialogState(prev => ({ ...prev, isOpen: false }));
+                if (onCancel) onCancel();
+            }
+        });
+    };
+
     const handleSavePlan = async (e) => {
         e.preventDefault();
         if (!editingPlan) return;
@@ -218,16 +309,58 @@ export default function SuperAdminDashboard() {
             };
 
             const res = await API.put(`/saas/admin/plans/${editingPlan.id}`, payload);
-            alert(`✅ ${res.data?.message || "Plan updated successfully!"}`);
+            showSuccessModal(
+                "Plan Updated Successfully!",
+                `The plan "${planFormData.name}" has been updated. Pricing and quota changes are active across the platform.`
+            );
             setIsPlanModalOpen(false);
             fetchSaasPlans();
             fetchTenants();
         } catch (err) {
             console.error("Save plan error:", err);
-            alert(err.response?.data?.detail || "Failed to update SaaS plan.");
+            showErrorModal("Failed to Update Plan", err.response?.data?.detail || "Could not update the SaaS plan.");
         } finally {
             setSavingPlan(false);
         }
+    };
+
+    const [deletingPlanId, setDeletingPlanId] = useState(null);
+
+    const handleDeletePlan = (plan) => {
+        if (!plan || !plan.id) return;
+        const subCount = plan.subscriber_count || 0;
+        let confirmText = `Are you sure you want to permanently delete the "${plan.name}" plan?`;
+        if (subCount > 0) {
+            confirmText = `⚠️ WARNING: ${subCount} property tenant(s) are currently subscribed to the "${plan.name}" plan.\n\nDeleting this plan will remove it from future selections and safely unlink existing subscribers without deleting their data.\n\nAre you sure you want to proceed?`;
+        }
+
+        showConfirmModal({
+            title: `Delete "${plan.name}" Plan?`,
+            message: confirmText,
+            type: 'danger',
+            confirmText: 'Yes, Delete Plan',
+            cancelText: 'Keep Plan',
+            onConfirm: async () => {
+                setDeletingPlanId(plan.id);
+                try {
+                    const res = await API.delete(`/saas/admin/plans/${plan.id}`);
+                    showSuccessModal(
+                        "Plan Deleted Successfully",
+                        res.data?.message || `The "${plan.name}" plan has been deleted.`
+                    );
+                    if (editingPlan && editingPlan.id === plan.id) {
+                        setIsPlanModalOpen(false);
+                    }
+                    fetchSaasPlans();
+                    fetchTenants();
+                } catch (err) {
+                    console.error("Delete plan error:", err);
+                    showErrorModal("Failed to Delete Plan", err.response?.data?.detail || "Could not delete this SaaS plan.");
+                } finally {
+                    setDeletingPlanId(null);
+                }
+            }
+        });
     };
 
     const handleApproveTenant = async (tenantId) => {
@@ -236,14 +369,17 @@ export default function SuperAdminDashboard() {
         try {
             const payload = enteredCode ? { branch_code: enteredCode } : {};
             const res = await API.post(`/saas/admin/approve-tenant/${tenantId}`, payload);
-            alert(`✅ ${res.data?.message || "Property approved and activated! Property admin can now log in."}`);
+            showSuccessModal(
+                "Property Approved & Activated!",
+                res.data?.message || "Property approved and activated! Property admin can now log in and operate."
+            );
             fetchTenants();
             // Refresh global branches
             const config = { headers: { "X-Branch-ID": "all" } };
             const bRes = await API.get("/branches?include_inactive=true", config);
             setBranches(bRes.data || []);
         } catch (e) {
-            alert(e.response?.data?.detail || "Approval failed. Please try again.");
+            showErrorModal("Approval Failed", e.response?.data?.detail || "Approval failed. Please try again.");
         } finally {
             setApprovingId(null);
         }
@@ -251,33 +387,7 @@ export default function SuperAdminDashboard() {
 
     const [acceptingPaymentId, setAcceptingPaymentId] = useState(null);
 
-    const handleAcceptPayment = async (tenant, targetStatus = "paid") => {
-        if (!tenant || !tenant.id) return;
-        const isMarkingPaid = targetStatus === "paid";
-        let confirmMsg = "";
-        let transactionRef = tenant.payment_ref || "";
-
-        if (isMarkingPaid) {
-            if (tenant.payment_status === "payment_raised") {
-                confirmMsg = `Payment of ₹${(tenant.monthly_amount || 0).toLocaleString()} was RAISED by "${tenant.business_name || tenant.name}".\n\n` +
-                    `• UTR / Ref: ${tenant.payment_ref || "N/A"}\n` +
-                    `• Method: ${tenant.payment_method || "UPI (Teqmates)"}\n\n` +
-                    `Do you want to ACCEPT this payment and activate the property workspace?`;
-            } else {
-                const userRef = window.prompt(
-                    `This property has NOT raised payment yet.\n\nTo raise and accept payment now on behalf of this property, enter UTR / Transaction Reference (or leave default for offline/direct payment):`,
-                    `TXN-${Date.now()}`
-                );
-                if (userRef === null) return; // cancelled
-                transactionRef = userRef.trim() || `TXN-${Date.now()}`;
-                confirmMsg = `Confirm raising and accepting payment for "${tenant.business_name || tenant.name}" with Ref "${transactionRef}"?`;
-            }
-        } else {
-            confirmMsg = `Are you sure you want to mark payment as UNPAID for "${tenant.business_name || tenant.name}"?`;
-        }
-
-        if (confirmMsg && !window.confirm(confirmMsg)) return;
-
+    const executeAcceptPayment = async (tenant, targetStatus, transactionRef) => {
         try {
             setAcceptingPaymentId(tenant.id);
             const res = await API.post(`/saas/admin/accept-payment/${tenant.id}`, {
@@ -286,7 +396,7 @@ export default function SuperAdminDashboard() {
                 transaction_ref: transactionRef,
                 activate_property: true
             });
-            alert(`✅ ${res.data?.message || "Payment status updated successfully!"}`);
+            showSuccessModal("Payment Status Updated", res.data?.message || "Payment status updated successfully!");
             fetchTenants();
             // Refresh global branches
             const config = { headers: { "X-Branch-ID": "all" } };
@@ -294,56 +404,125 @@ export default function SuperAdminDashboard() {
             setBranches(bRes.data || []);
         } catch (err) {
             console.error("Accept payment error:", err);
-            alert(err.response?.data?.detail || "Failed to update payment status.");
+            showErrorModal("Payment Update Failed", err.response?.data?.detail || "Failed to update payment status.");
         } finally {
             setAcceptingPaymentId(null);
         }
     };
 
-    const handleToggleTenantStatus = async (tenant) => {
-        const isCurrentlyActive = tenant.is_active !== false;
-        const action = isCurrentlyActive ? "disable" : "enable";
-        const propertyName = tenant.business_name || tenant.name;
+    const handleAcceptPayment = async (tenant, targetStatus = "paid") => {
+        if (!tenant || !tenant.id) return;
+        const isMarkingPaid = targetStatus === "paid";
 
-        if (isCurrentlyActive && !window.confirm(`Are you sure you want to disable property "${propertyName}"?\n\nStaff and users of this property will not be able to log in or use the workspace until re-enabled.`)) {
-            return;
+        if (isMarkingPaid) {
+            if (tenant.payment_status === "payment_raised") {
+                showConfirmModal({
+                    title: "Accept Verified Payment?",
+                    message: `Payment of ₹${(tenant.monthly_amount || 0).toLocaleString()} was raised by "${tenant.business_name || tenant.name}".\n\n• UTR / Ref: ${tenant.payment_ref || "N/A"}\n• Method: ${tenant.payment_method || "UPI (Teqmates)"}\n\nAccepting this will record the monthly bill as Paid and keep the property workspace active.`,
+                    type: 'info',
+                    confirmText: 'Accept & Activate',
+                    cancelText: 'Cancel',
+                    onConfirm: () => executeAcceptPayment(tenant, targetStatus, tenant.payment_ref || "")
+                });
+            } else {
+                showPromptModal({
+                    title: "Raise & Accept Payment",
+                    message: `This property has not submitted payment online yet. You can accept payment now on their behalf:`,
+                    inputLabel: "UTR / Transaction Reference (or leave default for cash/direct)",
+                    defaultValue: `TXN-${Date.now()}`,
+                    placeholder: "Enter transaction reference",
+                    confirmText: "Raise & Accept",
+                    cancelText: "Cancel",
+                    onConfirm: (val) => {
+                        const transactionRef = (val || "").trim() || `TXN-${Date.now()}`;
+                        executeAcceptPayment(tenant, targetStatus, transactionRef);
+                    }
+                });
+            }
+        } else {
+            showConfirmModal({
+                title: "Mark Payment as Unpaid?",
+                message: `Are you sure you want to mark payment as UNPAID for "${tenant.business_name || tenant.name}"?\n\nThe property admin will see a renewal reminder banner on their dashboard.`,
+                type: 'warning',
+                confirmText: 'Mark Unpaid',
+                cancelText: 'Cancel',
+                onConfirm: () => executeAcceptPayment(tenant, targetStatus, "")
+            });
         }
+    };
 
+    const executeToggleTenant = async (tenant, action) => {
         setTogglingTenantId(tenant.id);
         try {
             const res = await API.post(`/saas/admin/toggle-tenant-status/${tenant.id}`);
-            alert(`✅ ${res.data?.message || `Property ${action}d successfully.`}`);
+            showSuccessModal(
+                `Property ${action === "disable" ? "Disabled" : "Enabled"}`,
+                res.data?.message || `Property has been ${action}d successfully.`
+            );
             fetchTenants();
-            // Also refresh global branches
             const config = { headers: { "X-Branch-ID": "all" } };
             const bRes = await API.get("/branches?include_inactive=true", config);
             setBranches(bRes.data || []);
         } catch (e) {
-            alert(e.response?.data?.detail || `Failed to ${action} property.`);
+            showErrorModal("Action Failed", e.response?.data?.detail || `Failed to ${action} property.`);
         } finally {
             setTogglingTenantId(null);
         }
     };
 
-    const handleToggleBranchStatus = async (branch) => {
-        const isCurrentlyActive = branch.is_active !== false;
+    const handleToggleTenantStatus = (tenant) => {
+        const isCurrentlyActive = tenant.is_active !== false;
         const action = isCurrentlyActive ? "disable" : "enable";
+        const propertyName = tenant.business_name || tenant.name;
 
-        if (isCurrentlyActive && !window.confirm(`Are you sure you want to disable branch "${branch.name}"?`)) {
-            return;
+        if (isCurrentlyActive) {
+            showConfirmModal({
+                title: `Disable Property "${propertyName}"?`,
+                message: `Staff and users of this property will not be able to log in or use the workspace until re-enabled.\n\nAll existing data and records are safely preserved.`,
+                type: 'danger',
+                confirmText: 'Disable Property',
+                cancelText: 'Keep Active',
+                onConfirm: () => executeToggleTenant(tenant, action)
+            });
+        } else {
+            executeToggleTenant(tenant, action);
         }
+    };
 
+    const executeToggleBranch = async (branch, action) => {
         setTogglingBranchId(branch.id);
         try {
             await API.patch(`/branches/${branch.id}/toggle-status`);
+            showSuccessModal(
+                `Branch ${action === "disable" ? "Disabled" : "Enabled"}`,
+                `Branch "${branch.name}" has been ${action}d.`
+            );
             const config = { headers: { "X-Branch-ID": "all" } };
             const bRes = await API.get("/branches?include_inactive=true", config);
             setBranches(bRes.data || []);
             fetchTenants();
         } catch (e) {
-            alert(e.response?.data?.detail || `Failed to ${action} branch.`);
+            showErrorModal("Action Failed", e.response?.data?.detail || `Failed to ${action} branch.`);
         } finally {
             setTogglingBranchId(null);
+        }
+    };
+
+    const handleToggleBranchStatus = (branch) => {
+        const isCurrentlyActive = branch.is_active !== false;
+        const action = isCurrentlyActive ? "disable" : "enable";
+
+        if (isCurrentlyActive) {
+            showConfirmModal({
+                title: `Disable Branch "${branch.name}"?`,
+                message: `Staff will not be able to operate or switch to this branch until re-enabled.`,
+                type: 'danger',
+                confirmText: 'Disable Branch',
+                cancelText: 'Keep Active',
+                onConfirm: () => executeToggleBranch(branch, action)
+            });
+        } else {
+            executeToggleBranch(branch, action);
         }
     };
 
@@ -362,7 +541,7 @@ export default function SuperAdminDashboard() {
         email: '',
         password: '',
         payment_status: 'paid',
-        monthly_amount: 2500,
+        monthly_amount: 2999,
         gst_number: '',
         facebook: '',
         instagram: '',
@@ -401,7 +580,7 @@ export default function SuperAdminDashboard() {
                     location: '',
                     gst_number: '',
                     payment_status: target.payment_status || 'paid',
-                    monthly_amount: target.monthly_amount !== undefined ? target.monthly_amount : 2500,
+                    monthly_amount: target.monthly_amount !== undefined ? target.monthly_amount : 2999,
                     tenant_id: target.id
                 };
             }
@@ -416,7 +595,7 @@ export default function SuperAdminDashboard() {
             email: branchToEdit.email || '',
             password: '',
             payment_status: target.payment_status || branchToEdit.payment_status || 'paid',
-            monthly_amount: target.monthly_amount !== undefined ? target.monthly_amount : (branchToEdit.monthly_amount !== undefined ? branchToEdit.monthly_amount : 2500),
+            monthly_amount: target.monthly_amount !== undefined ? target.monthly_amount : (branchToEdit.monthly_amount !== undefined ? branchToEdit.monthly_amount : 2999),
             gst_number: branchToEdit.gst_number || '',
             facebook: branchToEdit.facebook || '',
             instagram: branchToEdit.instagram || '',
@@ -453,27 +632,27 @@ export default function SuperAdminDashboard() {
     const handleSubmitEdit = async (e) => {
         e.preventDefault();
         if (!editingBranch || !editingBranch.id) {
-            alert("No branch ID associated with this property yet.");
+            toast.error("No branch ID associated with this property yet.");
             return;
         }
 
         if (editFormData.email && !validateEmail(editFormData.email)) {
-            alert('Please enter a valid email address');
+            toast.error('Please enter a valid email address');
             return;
         }
 
         if (!editFormData.name || !editFormData.name.trim()) {
-            alert('Property name is required');
+            toast.error('Property name is required');
             return;
         }
 
         if (!editFormData.code || !editFormData.code.trim()) {
-            alert('Hotel / Branch Code is required');
+            toast.error('Hotel / Branch Code is required');
             return;
         }
 
         if (editFormData.password && editFormData.password.trim().length > 0 && editFormData.password.trim().length < 6) {
-            alert('Password must be at least 6 characters long');
+            toast.error('Password must be at least 6 characters long');
             return;
         }
 
@@ -498,7 +677,7 @@ export default function SuperAdminDashboard() {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            alert(`✅ Property "${editFormData.name}" updated successfully!`);
+            showSuccessModal("Property Updated Successfully!", `Property "${editFormData.name}" profile and credentials updated.`);
             setIsEditModalOpen(false);
 
             // Refresh data
@@ -507,7 +686,7 @@ export default function SuperAdminDashboard() {
             const bRes = await API.get("/branches?include_inactive=true", config);
             setBranches(bRes.data || []);
         } catch (error) {
-            alert(error.response?.data?.detail || 'Failed to update property details.');
+            showErrorModal("Update Failed", error.response?.data?.detail || 'Failed to update property details.');
         } finally {
             setIsSubmittingEdit(false);
         }
@@ -525,6 +704,7 @@ export default function SuperAdminDashboard() {
 
     const pendingTenants = useMemo(() => tenants.filter(t => t.subscription_status === 'pending_approval'), [tenants]);
     const pendingTenantsCount = pendingTenants.length;
+    const paymentRaisedCount = useMemo(() => tenants.filter(t => t.payment_status === 'payment_raised').length, [tenants]);
     const activeTenantsCount = useMemo(() => tenants.filter(t => t.subscription_status === 'active' && t.is_active !== false).length, [tenants]);
     const disabledTenantsCount = useMemo(() => tenants.filter(t => t.is_active === false).length, [tenants]);
 
@@ -533,6 +713,8 @@ export default function SuperAdminDashboard() {
             // Status filter
             if (tenantStatusFilter === "pending") {
                 if (tenant.subscription_status !== 'pending_approval') return false;
+            } else if (tenantStatusFilter === "payment_raised") {
+                if (tenant.payment_status !== 'payment_raised') return false;
             } else if (tenantStatusFilter === "active") {
                 if (tenant.subscription_status !== 'active' || tenant.is_active === false) return false;
             } else if (tenantStatusFilter === "disabled") {
@@ -900,14 +1082,26 @@ export default function SuperAdminDashboard() {
                                                 </div>
                                             </div>
 
-                                            {/* Action Button */}
-                                            <div className="pt-4 mt-3 border-t border-gray-100">
+                                            {/* Action Buttons */}
+                                            <div className="pt-4 mt-3 border-t border-gray-100 flex items-center gap-2">
                                                 <button
                                                     onClick={() => handleOpenEditPlanModal(plan)}
-                                                    className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 group"
+                                                    className="flex-1 py-2 px-3 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 group"
                                                 >
                                                     <Edit2 size={13} className="group-hover:scale-110 transition-transform" />
                                                     <span>Edit {plan.name}</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeletePlan(plan)}
+                                                    disabled={deletingPlanId === plan.id}
+                                                    title={`Delete ${plan.name} Plan`}
+                                                    className="p-2 bg-gray-50 hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded-xl border border-gray-200 hover:border-rose-200 transition-all flex items-center justify-center disabled:opacity-50"
+                                                >
+                                                    {deletingPlanId === plan.id ? (
+                                                        <Loader2 className="animate-spin" size={14} />
+                                                    ) : (
+                                                        <Trash2 size={14} />
+                                                    )}
                                                 </button>
                                             </div>
                                         </div>
@@ -918,18 +1112,23 @@ export default function SuperAdminDashboard() {
                     </div>
                 </section>
 
-                {/* Property Approvals Section */}
+                {/* Property Approvals & Subscription Payments Section */}
                 <section className="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
                     <div className="px-6 py-5 border-b border-amber-100 bg-amber-50/50 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <Shield className="text-amber-600" size={20} />
-                            <h3 className="text-lg font-bold text-gray-800">Property Approvals</h3>
+                            <h3 className="text-lg font-bold text-gray-800">Property Approvals &amp; Subscription Payments</h3>
                             {pendingTenantsCount > 0 && (
-                                <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-400 text-white animate-pulse">
-                                    {pendingTenantsCount} Pending
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-400 text-white animate-pulse">
+                                    {pendingTenantsCount} Registrations Pending
                                 </span>
                             )}
-                            <span className="text-xs text-gray-400 font-medium ml-2">
+                            {paymentRaisedCount > 0 && (
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs animate-bounce flex items-center gap-1">
+                                    ⚡ {paymentRaisedCount} Payment{paymentRaisedCount > 1 ? 's' : ''} to Verify
+                                </span>
+                            )}
+                            <span className="text-xs text-gray-400 font-medium ml-1">
                                 (Showing {filteredTenants.length} of {tenants.length})
                             </span>
                         </div>
@@ -961,7 +1160,7 @@ export default function SuperAdminDashboard() {
                                 type="text"
                                 value={tenantSearch}
                                 onChange={(e) => setTenantSearch(e.target.value)}
-                                placeholder="Search property, owner, email, hotel code, plan..."
+                                placeholder="Search property, owner, email, hotel code, plan, UTR..."
                                 className="w-full pl-10 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all text-gray-800 placeholder-gray-400 shadow-sm"
                             />
                             {tenantSearch && (
@@ -977,7 +1176,7 @@ export default function SuperAdminDashboard() {
                         {/* Status Tabs & Plan Filter */}
                         <div className="flex flex-wrap items-center gap-2">
                             {/* Status Filter Tabs */}
-                            <div className="flex items-center bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+                            <div className="flex items-center bg-gray-100 p-1 rounded-xl text-xs font-semibold flex-wrap">
                                 <button
                                     onClick={() => setTenantStatusFilter("all")}
                                     className={`px-3 py-1.5 rounded-lg transition-all ${
@@ -989,6 +1188,19 @@ export default function SuperAdminDashboard() {
                                     All ({tenants.length})
                                 </button>
                                 <button
+                                    onClick={() => setTenantStatusFilter("payment_raised")}
+                                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                                        tenantStatusFilter === "payment_raised"
+                                            ? "bg-amber-600 text-white shadow-sm font-bold"
+                                            : paymentRaisedCount > 0
+                                            ? "bg-amber-100 text-amber-900 font-bold hover:bg-amber-200"
+                                            : "text-amber-800 hover:text-amber-950 font-bold"
+                                    }`}
+                                >
+                                    <CreditCard size={12} />
+                                    <span>Verify Payments ({paymentRaisedCount})</span>
+                                </button>
+                                <button
                                     onClick={() => setTenantStatusFilter("pending")}
                                     className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                                         tenantStatusFilter === "pending"
@@ -996,7 +1208,7 @@ export default function SuperAdminDashboard() {
                                             : "text-amber-700 hover:text-amber-900"
                                     }`}
                                 >
-                                    <Clock size={12} /> Pending ({pendingTenantsCount})
+                                    <Clock size={12} /> Pending Approval ({pendingTenantsCount})
                                 </button>
                                 <button
                                     onClick={() => setTenantStatusFilter("active")}
@@ -1183,7 +1395,7 @@ export default function SuperAdminDashboard() {
                                                             onClick={() => handleAcceptPayment(tenant, 'paid')}
                                                             disabled={acceptingPaymentId === tenant.id}
                                                             className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 text-white text-xs font-extrabold rounded-lg transition-all flex items-center gap-1.5 shadow-sm hover:shadow ring-2 ring-emerald-400/50"
-                                                            title={`Accept payment of ₹${tenant.monthly_amount || 2500} (UTR: ${tenant.payment_ref || 'N/A'}) and activate property`}
+                                                            title={`Accept payment of ₹${tenant.monthly_amount || 2999} (UTR: ${tenant.payment_ref || 'N/A'}) and activate property`}
                                                         >
                                                             {acceptingPaymentId === tenant.id ? (
                                                                 <><Loader2 className="animate-spin" size={12} /> Confirming...</>
@@ -1932,34 +2144,163 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 {/* Actions */}
-                                <div className="flex items-center justify-end gap-3 pt-5 border-t border-gray-100">
+                                <div className="flex items-center justify-between gap-3 pt-5 border-t border-gray-100">
                                     <button
                                         type="button"
-                                        onClick={() => setIsPlanModalOpen(false)}
-                                        disabled={savingPlan}
-                                        className="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+                                        onClick={() => handleDeletePlan(editingPlan)}
+                                        disabled={savingPlan || deletingPlanId === editingPlan?.id}
+                                        className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs sm:text-sm rounded-xl border border-rose-200 transition-all flex items-center gap-1.5 disabled:opacity-50"
                                     >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={savingPlan}
-                                        className="px-7 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl hover:shadow-lg transition-all font-bold text-sm flex items-center justify-center gap-2 shadow-md disabled:opacity-70"
-                                    >
-                                        {savingPlan ? (
+                                        {deletingPlanId === editingPlan?.id ? (
                                             <>
                                                 <Loader2 className="animate-spin" size={16} />
-                                                Saving Plan...
+                                                Deleting Plan...
                                             </>
                                         ) : (
                                             <>
-                                                <CheckCircle size={16} />
-                                                Save Plan
+                                                <Trash2 size={16} />
+                                                Delete Plan
                                             </>
                                         )}
                                     </button>
+
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsPlanModalOpen(false)}
+                                            disabled={savingPlan || deletingPlanId === editingPlan?.id}
+                                            className="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={savingPlan || deletingPlanId === editingPlan?.id}
+                                            className="px-7 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl hover:shadow-lg transition-all font-bold text-sm flex items-center justify-center gap-2 shadow-md disabled:opacity-70"
+                                        >
+                                            {savingPlan ? (
+                                                <>
+                                                    <Loader2 className="animate-spin" size={16} />
+                                                    Saving Plan...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle size={16} />
+                                                    Save Plan
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* State-of-the-Art Luxury Confirmation & Action Modal */}
+                {dialogState.isOpen && (
+                    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
+                        <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 sm:p-7 overflow-hidden text-center transform transition-all animate-in zoom-in-95 duration-200">
+                            {/* Top decorative gradient bar */}
+                            <div className={`absolute top-0 left-0 right-0 h-2 bg-gradient-to-r ${
+                                dialogState.type === 'danger'
+                                    ? 'from-rose-500 via-red-500 to-orange-500'
+                                    : dialogState.type === 'warning'
+                                    ? 'from-amber-400 via-orange-500 to-yellow-500'
+                                    : dialogState.type === 'info'
+                                    ? 'from-indigo-500 via-blue-500 to-cyan-500'
+                                    : 'from-emerald-400 via-teal-500 to-cyan-500'
+                            }`} />
+
+                            {/* Glowing Icon Container */}
+                            <div className="flex justify-center mb-4 mt-2">
+                                <div className={`p-4 rounded-2xl shadow-inner relative flex items-center justify-center ${
+                                    dialogState.type === 'danger'
+                                        ? 'bg-rose-50 text-rose-600 border border-rose-100 ring-8 ring-rose-50/50'
+                                        : dialogState.type === 'warning'
+                                        ? 'bg-amber-50 text-amber-600 border border-amber-100 ring-8 ring-amber-50/50'
+                                        : dialogState.type === 'info'
+                                        ? 'bg-indigo-50 text-indigo-600 border border-indigo-100 ring-8 ring-indigo-50/50'
+                                        : 'bg-emerald-50 text-emerald-600 border border-emerald-100 ring-8 ring-emerald-50/50'
+                                }`}>
+                                    {dialogState.type === 'danger' ? (
+                                        <Trash2 size={36} className="text-rose-600" />
+                                    ) : dialogState.type === 'warning' ? (
+                                        <AlertTriangle size={36} className="text-amber-600" />
+                                    ) : dialogState.type === 'info' ? (
+                                        <CreditCard size={36} className="text-indigo-600" />
+                                    ) : (
+                                        <CheckCircle2 size={36} className="text-emerald-600" />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Title */}
+                            <h3 className="text-xl font-extrabold text-gray-900 tracking-tight mb-2">
+                                {dialogState.title}
+                            </h3>
+
+                            {/* Message Body */}
+                            <div className="text-sm text-gray-600 leading-relaxed mb-6 whitespace-pre-line text-left bg-gray-50/80 p-4 rounded-2xl border border-gray-100 font-medium">
+                                {dialogState.message}
+                            </div>
+
+                            {/* If Prompt Input */}
+                            {dialogState.isPrompt && (
+                                <div className="mb-6 text-left">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                                        {dialogState.inputLabel || "Input"}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={dialogState.inputValue}
+                                        onChange={(e) => setDialogState(prev => ({ ...prev, inputValue: e.target.value }))}
+                                        placeholder={dialogState.inputPlaceholder}
+                                        className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className={`flex gap-3 ${dialogState.isConfirm ? 'justify-end' : 'justify-center'}`}>
+                                {dialogState.isConfirm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (dialogState.onCancel) dialogState.onCancel();
+                                            setDialogState(prev => ({ ...prev, isOpen: false }));
+                                        }}
+                                        className="flex-1 px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-100 transition-all text-sm"
+                                    >
+                                        {dialogState.cancelText || 'Cancel'}
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const val = dialogState.inputValue;
+                                        if (dialogState.onConfirm) {
+                                            dialogState.onConfirm(val);
+                                        } else {
+                                            setDialogState(prev => ({ ...prev, isOpen: false }));
+                                        }
+                                    }}
+                                    className={`px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all ${
+                                        dialogState.isConfirm ? 'flex-1' : 'w-full'
+                                    } ${
+                                        dialogState.type === 'danger'
+                                            ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-rose-200'
+                                            : dialogState.type === 'warning'
+                                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-200'
+                                            : dialogState.type === 'info'
+                                            ? 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-indigo-200'
+                                            : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-200'
+                                    }`}
+                                >
+                                    {dialogState.confirmText || (dialogState.isConfirm ? 'Confirm' : 'Got it')}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

@@ -135,6 +135,7 @@ const routeToModuleMap = {
   "/activity-logs": ["settings_group", "activity_logs"],
   "/guestprofiles": ["guest_profiles", "guests"],
   "/billing": "billing",
+  "/subscription": ["billing", "subscription", "settings", "dashboard"],
   "/package": ["packages", "promotions"],
   "/Userfrontend_data": ["web_management", "website"],
   "/report": ["reports_global", "reports"]
@@ -287,13 +288,13 @@ export default function DashboardLayout({ children }) {
     { label: "Expenses", icon: <PiggyBank size={18} />, to: "/expenses" },
     { label: "Food Management", icon: <Grid size={18} />, to: "/food-orders" },
     { label: "Billing", icon: <Receipt size={18} />, to: "/billing" },
+    { label: "Monthly Bill & Plan", icon: <CreditCard size={18} />, to: "/subscription" },
     { label: "WEB Management", icon: <Globe size={18} />, to: "/Userfrontend_data" },
     { label: "Reports", icon: <Sun size={18} />, to: "/report" },
     { label: "GuestProfiles", icon: <Sun size={18} />, to: "/guestprofiles" },
     { label: "Employee Mgt", icon: <Briefcase size={18} />, to: "/employee-management" },
     { label: "Inventory", icon: <Warehouse size={18} />, to: "/inventory" },
     { label: "Day Audit", icon: <CalendarCheck size={18} />, to: "/day-audit" },
-    { label: "Subscription & Pay", icon: <CreditCard size={18} />, to: "/subscription" },
     { label: "Settings", icon: <Settings size={18} />, to: "/settings" },
     ...(isSuper ? [{ label: "Branch Mgt", icon: <Building2 size={18} />, to: "/branch-management" }] : []),
     { label: "Activity Logs", icon: <Activity size={18} />, to: "/activity-logs" },
@@ -302,6 +303,7 @@ export default function DashboardLayout({ children }) {
   const menuItems = allMenuItems.filter((item) => {
     // Both SuperAdmin and Branch Admin get all operational pages
     if (isSuper || isBranchAdmin) return true;
+    if (item.to === "/subscription") return !isSuper; // Always permanently available for property users
     
     const moduleId = routeToModuleMap[item.to];
     if (!moduleId) return permissions.includes(item.to);
@@ -667,46 +669,66 @@ export default function DashboardLayout({ children }) {
             </div>
           )}
 
-          {/* Monthly Bill & Expiry bar (always visible for non-superadmin tenants) */}
-          {tenantProfile && !isSuper && (
-            <div className="flex justify-end mb-2 gap-2 flex-wrap items-center">
-              {expiryDateFormatted && (
-                <div className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 shadow-2xs ${
-                  isOverdue
-                    ? "bg-rose-50 border-rose-300 text-rose-700 animate-pulse"
-                    : isDueSoon
-                    ? "bg-amber-50 border-amber-300 text-amber-800"
-                    : "bg-slate-50 border-slate-200 text-slate-700"
-                }`}>
-                  <Calendar size={13} className={isOverdue ? "text-rose-500" : isDueSoon ? "text-amber-500" : "text-slate-400"} />
-                  <span>Expiry: {expiryDateFormatted}</span>
-                  {daysUntilDue !== null && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                      isOverdue ? "bg-rose-200 text-rose-900" : isDueSoon ? "bg-amber-200 text-amber-900" : "bg-slate-200 text-slate-800"
-                    }`}>
-                      {isOverdue ? `${Math.abs(daysUntilDue)}d overdue` : daysUntilDue === 0 ? "Due Today" : `${daysUntilDue}d left`}
-                    </span>
-                  )}
-                </div>
-              )}
-              <Link
-                to="/subscription"
-                className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl shadow-sm transition-all hover:opacity-80"
-                style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--accent-text)', border: '1px solid var(--border-color)' }}
-              >
-                <CreditCard size={14} />
-                Monthly Subscription &amp; Payments
-                {(billingInfo?.payment_status === 'unpaid' || isOverdue) && (
-                  <span className="ml-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          {/* Monthly Bill & Expiry bar (always permanently visible for all property admins) */}
+          {!isSuper && (
+            <div className="flex justify-end mb-4 gap-2 flex-wrap items-center">
+              {/* Payment / Expiry Status Badge */}
+              <div className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 shadow-2xs ${
+                isOverdue
+                  ? "bg-rose-50 border-rose-300 text-rose-700 animate-pulse"
+                  : isDueSoon
+                  ? "bg-amber-50 border-amber-300 text-amber-800"
+                  : isPaymentRaised
+                  ? "bg-indigo-50 border-indigo-300 text-indigo-800"
+                  : "bg-emerald-50 border-emerald-200 text-emerald-800"
+              }`}>
+                {isOverdue ? (
+                  <AlertCircle size={14} className="text-rose-600" />
+                ) : isPaymentRaised ? (
+                  <Zap size={14} className="text-indigo-600" />
+                ) : isDueSoon ? (
+                  <Clock size={14} className="text-amber-600" />
+                ) : (
+                  <CheckCircle2 size={14} className="text-emerald-600" />
                 )}
-              </Link>
+                <span>
+                  {isOverdue
+                    ? `Payment Overdue (₹${(billingInfo?.monthly_amount || 0).toLocaleString()})`
+                    : isPaymentRaised
+                    ? `Payment Raised • Under Verification`
+                    : isDueSoon
+                    ? `Monthly Bill Due Soon (${daysUntilDue === 0 ? "Today" : `in ${daysUntilDue}d`})`
+                    : `Monthly Bill: Paid`}
+                </span>
+                {expiryDateFormatted && (
+                  <span className="text-[11px] opacity-75 font-normal">
+                    • {isOverdue ? "Expired: " : "Valid until: "}{expiryDateFormatted}
+                  </span>
+                )}
+              </div>
+
+              {/* Monthly Bill Action Button (Always Accessible) */}
               <button
                 onClick={() => setShowBillingModal(true)}
-                className="p-2 text-xs font-semibold rounded-xl shadow-sm transition-all bg-white hover:bg-gray-50 border border-gray-200 text-gray-600"
-                title="Quick Billing Summary &amp; Pay"
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-xl shadow-xs transition-all ${
+                  isOverdue || isUnpaid
+                    ? "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white shadow-rose-200"
+                    : isPaymentRaised
+                    ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                    : "bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 hover:border-gray-300 shadow-2xs"
+                }`}
               >
-                <Zap size={14} className="text-amber-500" />
+                <CreditCard size={14} className={isOverdue || isUnpaid || isPaymentRaised ? "text-white" : "text-emerald-600"} />
+                <span>{isOverdue || isUnpaid ? `Pay Monthly Bill (₹${(billingInfo?.monthly_amount || 0).toLocaleString()})` : "Monthly Bill & Invoices"}</span>
               </button>
+
+              <Link
+                to="/subscription"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors shadow-2xs"
+              >
+                <Zap size={13} className="text-indigo-600" />
+                <span>Plan Details</span>
+              </Link>
             </div>
           )}
 

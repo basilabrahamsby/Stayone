@@ -2323,6 +2323,8 @@ def get_checkout_details(checkout_id: int, db: Session = Depends(get_db), curren
             has_svc_query = True
             
     if has_svc_query:
+        if checkout.branch_id is not None:
+            svc_query = svc_query.filter(AssignedService.branch_id == checkout.branch_id)
         assigned_services = svc_query.all()
         for ass in assigned_services:
             services.append({
@@ -2836,15 +2838,36 @@ def _calculate_bill_for_single_room(db: Session, room_number: str, branch_id: in
     booking_check_in_datetime = datetime.combine(booking.check_in, datetime.min.time())
     booking_check_out_datetime = datetime.combine(booking.check_out, datetime.max.time())
 
+    target_branch_id = getattr(booking, 'branch_id', None) or (room.branch_id if room else branch_id)
     if is_package:
-         # For packages, include ALL services linked to this package booking across ALL rooms
+         # For packages, include services linked to this package booking or room
          svc_query = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
-             AssignedService.package_booking_id == booking.id
+             or_(
+                 AssignedService.package_booking_id == booking.id,
+                 and_(
+                     AssignedService.room_id == room.id,
+                     AssignedService.package_booking_id == None,
+                     AssignedService.booking_id == None,
+                     AssignedService.assigned_at >= booking_check_in_datetime,
+                     AssignedService.assigned_at <= booking_check_out_datetime
+                 )
+             ) if room else (AssignedService.package_booking_id == booking.id)
          )
     else:
          svc_query = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
-             AssignedService.booking_id == booking.id
+             or_(
+                 AssignedService.booking_id == booking.id,
+                 and_(
+                     AssignedService.room_id == room.id,
+                     AssignedService.booking_id == None,
+                     AssignedService.package_booking_id == None,
+                     AssignedService.assigned_at >= booking_check_in_datetime,
+                     AssignedService.assigned_at <= booking_check_out_datetime
+                 )
+             ) if room else (AssignedService.booking_id == booking.id)
          )
+    if target_branch_id is not None:
+         svc_query = svc_query.filter(AssignedService.branch_id == target_branch_id)
          
     all_assigned_services = svc_query.all()
     
@@ -3736,9 +3759,10 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str, branch_id:
     # Get ALL assigned services for these rooms (both billed and unbilled)
     # Filter by booking ID to include all services linked to this booking,
     # OR include services with no booking link but assigned during this booking's stay
+    target_branch_id = getattr(booking, 'branch_id', None)
     if is_package:
         # Include ALL services for this package across ALL rooms
-        all_assigned_services = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
+        svc_query = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
             or_(
                 AssignedService.package_booking_id == booking.id,
                 and_(
@@ -3749,21 +3773,23 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str, branch_id:
                     AssignedService.assigned_at <= booking_check_out_datetime
                 )
             )
-        ).all()
+        )
     else:
-        all_assigned_services = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
-            AssignedService.room_id.in_(room_ids)
-        ).filter(
+        svc_query = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
             or_(
                 AssignedService.booking_id == booking.id,
                 and_(
+                    AssignedService.room_id.in_(room_ids),
                     AssignedService.booking_id == None,
                     AssignedService.package_booking_id == None,
                     AssignedService.assigned_at >= booking_check_in_datetime,
                     AssignedService.assigned_at <= booking_check_out_datetime
                 )
             )
-        ).all()
+        )
+    if target_branch_id is not None:
+        svc_query = svc_query.filter(AssignedService.branch_id == target_branch_id)
+    all_assigned_services = svc_query.all()
     
     # Separate unbilled, paid-at-counter, and billed services
     unbilled_services = [ass for ass in all_assigned_services if ass.billing_status in ["unbilled", "unpaid"] or ass.billing_status is None]
@@ -5133,15 +5159,25 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, backgro
                 FoodOrder.status != "cancelled"  # Don't complete cancelled orders
             ).update({"billing_status": "billed", "status": "completed"})
             
-            db.query(AssignedService).filter(
-                AssignedService.room_id == room.id, 
-                AssignedService.billing_status == "unbilled",
-                AssignedService.status != "cancelled" # Don't complete cancelled services
-            ).update({
+            svc_update_filter = [
+                or_(
+                    AssignedService.room_id == room.id,
+                    and_(
+                        AssignedService.booking_id == (booking.id if not is_package else None),
+                        AssignedService.package_booking_id == (booking.id if is_package else None),
+                        AssignedService.room_id == None
+                    )
+                ),
+                AssignedService.billing_status.in_(["unbilled", "unpaid"]) | (AssignedService.billing_status == None),
+                AssignedService.status != "cancelled"
+            ]
+            if effective_branch_id is not None:
+                svc_update_filter.append(AssignedService.branch_id == effective_branch_id)
+            db.query(AssignedService).filter(*svc_update_filter).update({
                 "billing_status": "billed",
                 "status": "completed",
                 "last_used_at": datetime.now(__import__("datetime").timezone.utc)
-            })
+            }, synchronize_session=False)
             
             # 12. Inventory Triggers
             # Check for CheckoutRequest first
@@ -5255,7 +5291,7 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, backgro
                 )
                 # Create refill service request with checkout_id to get consumables data
                 service_request_crud.create_refill_service_request(
-                    db, room.id, room.number, booking.guest_name, new_checkout.id, branch_id=branch_id
+                    db, room.id, room.number, booking.guest_name, new_checkout.id, branch_id=effective_branch_id
                 )
                 # Note: 'return_items' service request creation is REMOVED as it is now integrated into Checkout Verification
             except Exception as service_request_error:
@@ -5912,15 +5948,22 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, backgro
                 FoodOrder.status != "cancelled"  # Don't complete cancelled orders
             ).update({"billing_status": "billed", "status": "completed"})
             
-            db.query(AssignedService).filter(
-                AssignedService.room_id.in_(room_ids), 
-                AssignedService.billing_status == "unbilled",
-                AssignedService.status != "cancelled" # Don't complete cancelled services
-            ).update({
+            svc_update_filter = [
+                or_(
+                    AssignedService.room_id.in_(room_ids),
+                    AssignedService.booking_id == (booking.id if not is_package else None),
+                    AssignedService.package_booking_id == (booking.id if is_package else None)
+                ),
+                AssignedService.billing_status.in_(["unbilled", "unpaid"]) | (AssignedService.billing_status == None),
+                AssignedService.status != "cancelled"
+            ]
+            if effective_branch_id is not None:
+                svc_update_filter.append(AssignedService.branch_id == effective_branch_id)
+            db.query(AssignedService).filter(*svc_update_filter).update({
                 "billing_status": "billed",
                 "status": "completed",
                 "last_used_at": datetime.now(__import__("datetime").timezone.utc)
-            })
+            }, synchronize_session=False)
             
             # 11. Inventory Triggers for all rooms (Linen only, consumables handled in Step 8)
             if request.room_verifications:

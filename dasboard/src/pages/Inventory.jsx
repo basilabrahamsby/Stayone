@@ -1026,6 +1026,7 @@ const Inventory = () => {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showVendorForm, setShowVendorForm] = useState(false);
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
+  const [showNoMainInventoryModal, setShowNoMainInventoryModal] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [showPurchaseDetails, setShowPurchaseDetails] = useState(false);
   const [showUnitForm, setShowUnitForm] = useState(false);
@@ -1356,7 +1357,7 @@ const Inventory = () => {
         fetchAssetMappings(0, true);
         // Also fetch metadata needed for the assignment form
         Promise.all([
-          API.get("/inventory/items?limit=1000&is_fixed_asset=true").then(res => setItems(res.data || [])),
+          API.get("/inventory/items?limit=1000").then(res => setItems(res.data || [])),
           API.get("/inventory/locations?limit=10000").then(res => setLocations(res.data || [])),
           API.get("/inventory/categories?limit=1000").then(res => setCategories(res.data || []))
         ]).catch(err => console.error("Failed to fetch asset metadata:", err));
@@ -1421,6 +1422,13 @@ const Inventory = () => {
           setFoodItems(foodRes.data || []);
         } catch (err) {
           console.error("Failed to fetch food items:", err);
+        }
+        // Also fetch all inventory items for the recipe form
+        try {
+          const itemsRes = await API.get("/inventory/items?limit=10000");
+          setItems(itemsRes.data || []);
+        } catch (err) {
+          console.error("Failed to fetch inventory items:", err);
         }
       } else if (activeTab === "inter-branch-transfer") {
         fetchTransfers();
@@ -1857,14 +1865,72 @@ const Inventory = () => {
     setShowVendorForm(true);
   };
 
+  // Helper to find all valid Main Inventory locations for active branch
+  const getMainInventories = useCallback(() => {
+    return locations.filter(loc => 
+      loc.is_active !== false && (
+        loc.is_inventory_point ||
+        ["MAIN_INVENTORY", "WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE", "SUB_STORE"].includes((loc.location_type || "").toUpperCase()) ||
+        (loc.name || "").toLowerCase().includes("main inventory") ||
+        (loc.name || "").toLowerCase().includes("main warehouse") ||
+        (loc.name || "").toLowerCase().includes("central store") ||
+        (loc.name || "").toLowerCase().includes("central warehouse") ||
+        (loc.name || "").toLowerCase().includes("main store")
+      )
+    );
+  }, [locations]);
+
+  // Handler to open New Purchase form with mandatory Main Inventory validation
+  const handleOpenNewPurchase = () => {
+    const mainInvs = getMainInventories();
+    if (mainInvs.length === 0) {
+      setShowNoMainInventoryModal(true);
+      return;
+    }
+    // Auto-preselect destination_location_id if empty
+    const defaultMain = mainInvs.find(l => 
+      (l.name || "").toLowerCase().includes("main") || 
+      ["MAIN_INVENTORY", "CENTRAL_WAREHOUSE"].includes((l.location_type || "").toUpperCase())
+    ) || mainInvs[0];
+
+    setPurchaseForm(prev => ({
+      ...prev,
+      destination_location_id: prev.destination_location_id || defaultMain.id,
+      purchase_date: prev.purchase_date || getCurrentDateIST()
+    }));
+    setShowPurchaseForm(true);
+  };
+
   // Purchase handlers
   const handlePurchaseSubmit = async (e) => {
     e.preventDefault();
     try {
+      // MANDATORY RULE: At least one Main Inventory is required before creating a purchase
+      const mainInvs = getMainInventories();
+      if (mainInvs.length === 0) {
+        addNotification({
+          title: "Main Inventory Mandatory",
+          message: "Before creating a purchase, at least one Main Inventory is mandatory. Please create a Main Inventory location first.",
+          type: "error"
+        });
+        setShowNoMainInventoryModal(true);
+        return;
+      }
+
       // Validate required fields
       if (!purchaseForm.purchase_number || !purchaseForm.vendor_id) {
         addNotification({ title: "Validation Error", message: "Please fill in all required fields (PO Number and Vendor)", type: "error" });
         return;
+      }
+
+      // Ensure destination_location_id is set to a valid Main Inventory
+      let destLocId = purchaseForm.destination_location_id ? parseInt(purchaseForm.destination_location_id) : null;
+      if (!destLocId) {
+        const defaultMain = mainInvs.find(l => 
+          (l.name || "").toLowerCase().includes("main") || 
+          ["MAIN_INVENTORY", "CENTRAL_WAREHOUSE"].includes((l.location_type || "").toUpperCase())
+        ) || mainInvs[0];
+        destLocId = defaultMain.id;
       }
 
       // Calculate totals and prepare details
@@ -1934,7 +2000,7 @@ const Inventory = () => {
         payment_status: purchaseForm.payment_status || "pending",
         payment_method: purchaseForm.payment_method || "Cash",
         payment_date: purchaseForm.payment_date || null,
-        destination_location_id: purchaseForm.destination_location_id ? parseInt(purchaseForm.destination_location_id) : null,
+        destination_location_id: destLocId,
         notes: purchaseForm.notes || null,
         status: purchaseForm.status || "draft",
         details: details,
@@ -2912,8 +2978,8 @@ const Inventory = () => {
               )}
               {activeTab === "purchases" && hasPermission('inventory_purchase:create') && (
                 <button
-                  onClick={() => setShowPurchaseForm(true)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                  onClick={handleOpenNewPurchase}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm hover:shadow transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   New Purchase
@@ -4430,6 +4496,70 @@ const Inventory = () => {
               }
             }}
           />
+        )
+      }
+
+      {/* Main Inventory Mandatory Warning Modal */}
+      {
+        showNoMainInventoryModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[10002] p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 transform transition-all scale-100">
+              <div className="relative bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-6 text-white text-center">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
+                  <Building2 className="w-9 h-9 text-white" />
+                </div>
+                <h3 className="text-2xl font-black tracking-tight">Main Inventory Required</h3>
+                <p className="text-amber-100 text-sm mt-1">Rule: A Main Inventory is mandatory before creating a purchase</p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex gap-3 text-amber-900">
+                  <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm leading-relaxed">
+                    <span className="font-bold">Cannot Create Purchase:</span> In our inventory system, every purchase order requires an active <strong>Main Inventory</strong> (Warehouse / Central Store) to receive, store, and account for inward stock. Currently, this branch does not have any Main Inventory configured.
+                  </div>
+                </div>
+
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Please create your Main Inventory location first. Once created, all purchase orders will automatically be received and tracked in that storage point.
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowNoMainInventoryModal(false)}
+                    className="flex-1 py-2.5 px-4 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNoMainInventoryModal(false);
+                      // Pre-fill location form for 1-click Main Inventory creation
+                      setLocationForm({
+                        name: "Main Inventory",
+                        location_type: "MAIN_INVENTORY",
+                        building: "Main Building",
+                        floor: "Ground",
+                        room_area: "Central Store",
+                        parent_location_id: "",
+                        is_inventory_point: true,
+                        description: "Primary central inventory point for receiving purchases and stock storage",
+                        is_active: true,
+                      });
+                      setEditingLocation(null);
+                      setShowLocationForm(true);
+                    }}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold shadow-lg shadow-indigo-200 transition-all text-sm flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Main Inventory
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )
       }
 
@@ -7153,8 +7283,9 @@ function PurchaseFormModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Destination Location *
+              <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                <span>Destination (Main Inventory) *</span>
+                <span className="text-xs font-normal text-indigo-600">Stock Storage Point</span>
               </label>
               <select
                 value={form.destination_location_id || ""}
@@ -7162,12 +7293,18 @@ function PurchaseFormModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
                 required
               >
-                <option value="">Select Destination</option>
+                <option value="">Select Main Inventory</option>
                 {locations
-                  .filter((loc) => loc.is_inventory_point)
+                  .filter((loc) => 
+                    loc.is_active !== false && (
+                      loc.is_inventory_point ||
+                      ["MAIN_INVENTORY", "WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE", "SUB_STORE"].includes((loc.location_type || "").toUpperCase()) ||
+                      (loc.name || "").toLowerCase().includes("main")
+                    )
+                  )
                   .map((loc) => (
                     <option key={loc.id} value={loc.id}>
-                      {loc.name || `${loc.building} - ${loc.room_area}`}
+                      {loc.name || `${loc.building} - ${loc.room_area}`} {loc.location_type ? `(${loc.location_type})` : ""}
                     </option>
                   ))}
               </select>
@@ -9313,14 +9450,15 @@ function WasteLogFormModal({
 // Location Form Modal
 function LocationFormModal({ form, setForm, locations, onSubmit, onClose, activeBranchId, selectedBranchForCreation, setSelectedBranchForCreation, branches, editingLocation }) {
   const locationTypes = [
-    { value: "GUEST_ROOM", label: "Guest Room" },
-    { value: "WAREHOUSE", label: "Warehouse" },
-    { value: "LAUNDRY", label: "Laundry" },
-    { value: "DEPARTMENT", label: "Department" },
-    { value: "PUBLIC_AREA", label: "Public Area" },
+    { value: "MAIN_INVENTORY", label: "Main Inventory (Central Store)" },
     { value: "CENTRAL_WAREHOUSE", label: "Central Warehouse" },
+    { value: "WAREHOUSE", label: "Warehouse" },
     { value: "BRANCH_STORE", label: "Branch Store" },
     { value: "SUB_STORE", label: "Sub Store" },
+    { value: "DEPARTMENT", label: "Department Store" },
+    { value: "GUEST_ROOM", label: "Guest Room" },
+    { value: "LAUNDRY", label: "Laundry" },
+    { value: "PUBLIC_AREA", label: "Public Area" },
   ];
 
   return (
@@ -9423,9 +9561,15 @@ function LocationFormModal({ form, setForm, locations, onSubmit, onClose, active
             </label>
             <select
               value={form.location_type}
-              onChange={(e) =>
-                setForm({ ...form, location_type: e.target.value })
-              }
+              onChange={(e) => {
+                const val = e.target.value;
+                const isInvPoint = ["MAIN_INVENTORY", "CENTRAL_WAREHOUSE", "WAREHOUSE", "BRANCH_STORE"].includes(val);
+                setForm({
+                  ...form,
+                  location_type: val,
+                  is_inventory_point: isInvPoint ? true : form.is_inventory_point,
+                });
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               required
             >
@@ -10699,6 +10843,32 @@ function RecipeFormModal({
   onClose,
   addNotification,
 }) {
+  const [inventoryItemsList, setInventoryItemsList] = useState(items || []);
+
+  useEffect(() => {
+    if (items && items.length > 0) {
+      setInventoryItemsList(items);
+    }
+  }, [items]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadAllInventoryItems = async () => {
+      try {
+        const res = await API.get("/inventory/items?limit=10000");
+        if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+          setInventoryItemsList(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to load all inventory items for recipe form:", err);
+      }
+    };
+    loadAllInventoryItems();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const addIngredient = () => {
     setForm({
       ...form,
@@ -10897,45 +11067,74 @@ function RecipeFormModal({
                     .map(d => String(d.inventory_item_id))
                     .filter(id => id !== "");
 
-                  const rowAvailableItems = items.filter(i => 
-                    !otherSelectedIngredientIds.includes(String(i.id))
-                  );
+                  const rowAvailableItems = inventoryItemsList
+                    .filter((i) => !otherSelectedIngredientIds.includes(String(i.id)))
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
                   return (
                     <div
                       key={index}
                       className="flex gap-2 items-end p-3 border border-gray-200 rounded-lg"
                     >
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-[260px]">
                         <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Inventory Item
+                          Inventory Item *
                         </label>
-                        <select
-                          value={ingredient.inventory_item_id}
-                          onChange={(e) => {
-                            const selectedItemId = e.target.value;
-                            const selectedItem = items.find(
-                              (i) => i.id === parseInt(selectedItemId),
+                        <Select
+                          value={
+                            ingredient.inventory_item_id
+                              ? (() => {
+                                  const found = inventoryItemsList.find(
+                                    (i) => String(i.id) === String(ingredient.inventory_item_id)
+                                  );
+                                  return found
+                                    ? {
+                                        value: found.id,
+                                        label: `${found.name} (${found.unit || "unit"})${found.category_name ? ` - [${found.category_name}]` : ""}`
+                                      }
+                                    : {
+                                        value: ingredient.inventory_item_id,
+                                        label: `Item #${ingredient.inventory_item_id}`
+                                      };
+                                })()
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const selectedItemId = selected ? selected.value : "";
+                            const selectedItem = inventoryItemsList.find(
+                              (i) => String(i.id) === String(selectedItemId)
                             );
                             const newIngredients = [...form.ingredients];
                             newIngredients[index] = {
                               ...newIngredients[index],
                               inventory_item_id: selectedItemId,
                               unit: selectedItem
-                                ? selectedItem.unit
+                                ? (selectedItem.unit || "")
                                 : newIngredients[index].unit,
                             };
                             setForm({ ...form, ingredients: newIngredients });
                           }}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                          required
-                        >
-                          <option value="">Select Item</option>
-                          {rowAvailableItems.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name} ({item.unit})
-                            </option>
-                          ))}
-                        </select>
+                          options={rowAvailableItems.map((item) => ({
+                            value: item.id,
+                            label: `${item.name} (${item.unit || "unit"})${item.category_name ? ` - [${item.category_name}]` : ""}`
+                          }))}
+                          isSearchable
+                          isClearable
+                          placeholder="Select or search inventory item..."
+                          className="text-sm react-select-container"
+                          classNamePrefix="react-select"
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              borderRadius: "0.375rem",
+                              borderColor: "#d1d5db",
+                              "&:hover": { borderColor: "#6366f1" },
+                              minHeight: "36px",
+                              fontSize: "0.875rem",
+                            }),
+                            menuPortal: (base) => ({ ...base, zIndex: 99999 }),
+                          }}
+                          menuPortalTarget={document.body}
+                        />
                       </div>
                     <div className="w-24">
                       <label className="block text-xs font-medium text-gray-600 mb-1">

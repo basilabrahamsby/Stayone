@@ -67,12 +67,12 @@ const QuickActions = () => {
             path: '/reports'
         },
         {
-            id: 'inventory',
-            title: 'Inventory',
-            icon: '📦',
-            description: 'Manage stock',
-            color: 'success',
-            path: '/role'
+            id: 'monthly-bill',
+            title: 'Monthly Bill',
+            icon: '💳',
+            description: 'Subscription & invoices',
+            color: 'purple',
+            path: '/subscription'
         }
     ];
 

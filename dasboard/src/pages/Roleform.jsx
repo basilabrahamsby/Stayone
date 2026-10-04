@@ -127,7 +127,7 @@ const actions = [
 ];
 
 // Define roles that cannot be deleted from the UI
-const PROTECTED_ROLES = ['admin'];
+const PROTECTED_ROLES = ['admin', 'owner / admin', 'property admin', 'owner', 'superadmin'];
 
 const RoleForm = () => {
   const [form, setForm] = useState({ name: "", permissions: [] });

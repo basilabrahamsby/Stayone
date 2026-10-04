@@ -191,7 +191,7 @@ def register_saas_business(req: SaaSUserRegisterRequest, db: Session = Depends(g
     try:
         # 3. Create Tenant (No free trial - pending platform admin approval)
         now = datetime.now(timezone.utc)
-        monthly_amt = plan.price_monthly if plan and plan.price_monthly > 0 else 2500.0
+        monthly_amt = plan.price_monthly if (plan and plan.price_monthly is not None) else 2999.0
         
         tenant = Tenant(
             name=req.business_name.strip(),
@@ -285,7 +285,7 @@ def register_saas_business(req: SaaSUserRegisterRequest, db: Session = Depends(g
                 "currency": tenant.currency,
                 "subscription_status": tenant.subscription_status,
                 "is_approved": False,
-                "monthly_amount": tenant.monthly_amount,
+                "monthly_amount": tenant.monthly_amount if tenant.monthly_amount is not None else (tenant.plan.price_monthly if getattr(tenant, 'plan', None) else 2999.0),
                 "payment_status": tenant.payment_status,
                 "next_billing_date": str(tenant.next_billing_date) if tenant.next_billing_date else None,
                 "branch_code": branch.code
@@ -446,7 +446,7 @@ def list_all_tenants_for_admin(db: Session = Depends(get_db)):
             "is_active": bool(t.is_active),
             "plan_name": t.plan.name if t.plan else "Starter",
             "plan_code": t.plan.code if t.plan else "starter",
-            "monthly_amount": t.monthly_amount or (t.plan.price_monthly if t.plan else 2500.0),
+            "monthly_amount": t.monthly_amount if t.monthly_amount is not None else (t.plan.price_monthly if t.plan else 2999.0),
             "payment_status": t.payment_status or "unpaid",
             "payment_ref": getattr(t, 'payment_ref', None),
             "payment_method": getattr(t, 'payment_method', None),
@@ -771,6 +771,28 @@ def update_plan_for_admin(
     }
 
 
+@router.delete("/admin/plans/{plan_id}")
+def delete_plan_for_admin(plan_id: int, db: Session = Depends(get_db)):
+    """Allow SuperAdmin to delete a SaaS plan"""
+    plan = db.query(SaaSPlan).filter(SaaSPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="SaaS Plan not found")
+
+    # Unlink any tenants currently assigned to this plan
+    tenants = db.query(Tenant).filter(Tenant.plan_id == plan.id).all()
+    for t in tenants:
+        t.plan_id = None
+
+    plan_name = plan.name
+    db.delete(plan)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Plan '{plan_name}' has been deleted successfully."
+    }
+
+
 # --- Property Billing & Payment Endpoints (Day 1 & Monthly) ---
 
 class PayBillRequest(BaseModel):
@@ -792,7 +814,7 @@ def get_tenant_billing(
 ):
     """Fetch property billing, monthly subscription rates, and payment options"""
     primary_branch = db.query(Branch).filter(Branch.tenant_id == tenant.id).first()
-    monthly_amt = tenant.monthly_amount or (tenant.plan.price_monthly if tenant.plan else 2500.0)
+    monthly_amt = tenant.monthly_amount if tenant.monthly_amount is not None else (tenant.plan.price_monthly if tenant.plan else 2999.0)
     now = datetime.now(timezone.utc)
     next_date = tenant.next_billing_date or (now + timedelta(days=30))
     if next_date.tzinfo is None:
@@ -867,9 +889,10 @@ def raise_property_payment(
     
     db.commit()
     db.refresh(tenant)
+    amount_val = getattr(tenant, 'monthly_amount', None) if getattr(tenant, 'monthly_amount', None) is not None else (tenant.plan.price_monthly if getattr(tenant, 'plan', None) else 2999.0)
     return {
         "success": True,
-        "message": f"Payment of {tenant.currency} {tenant.monthly_amount:,.2f} raised with UTR '{tenant.payment_ref}'! Super Admin can now verify and accept the payment.",
+        "message": f"Payment of {tenant.currency} {amount_val:,.2f} raised with UTR '{tenant.payment_ref}'! Super Admin can now verify and accept the payment.",
         "tenant_id": tenant.id,
         "payment_status": tenant.payment_status,
         "payment_ref": tenant.payment_ref,

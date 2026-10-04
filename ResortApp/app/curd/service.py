@@ -404,6 +404,8 @@ def create_assigned_service(db: Session, assigned: AssignedServiceCreate, branch
             room = db.query(Room).filter(Room.id == room_id).first()
             if not room:
                 raise ValueError(f"Room with ID {room_id} not found")
+            if room.branch_id:
+                assigned_dict['branch_id'] = room.branch_id
             if not location_id and room.inventory_location_id:
                 location_id = room.inventory_location_id
                 assigned_dict['location_id'] = location_id
@@ -418,9 +420,19 @@ def create_assigned_service(db: Session, assigned: AssignedServiceCreate, branch
                 if room:
                     room_id = room.id
                     assigned_dict['room_id'] = room_id
+                    if room.branch_id:
+                        assigned_dict['branch_id'] = room.branch_id
+
+        # Enforce same branch concept: Service and Employee must belong to the target branch
+        target_branch = assigned_dict.get('branch_id')
+        if target_branch:
+            if service.branch_id and service.branch_id != target_branch:
+                raise ValueError(f"Service '{service.name}' belongs to branch {service.branch_id} and cannot be assigned to branch {target_branch}")
+            if employee.branch_id and employee.branch_id != target_branch:
+                raise ValueError(f"Employee '{employee.name}' belongs to branch {employee.branch_id} and cannot be assigned to branch {target_branch}")
         
         target_name = room.number if room else (location.name if location else "Unknown Target")
-        print(f"[DEBUG] All references valid: Service={service.name}, Employee={employee.name}, Target={target_name}")
+        print(f"[DEBUG] All references valid: Service={service.name}, Employee={employee.name}, Target={target_name}, Branch={target_branch}")
         
         # Load service inventory items if service has any
         service_inventory_items = []

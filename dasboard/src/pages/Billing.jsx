@@ -2353,7 +2353,16 @@ const Billing = () => {
       </div>
 
       <div className="p-2 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Business Dashboard & Checkout</h1>
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Business Dashboard & Checkout</h1>
+          <button
+            onClick={() => navigate('/subscription')}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-emerald-500/20 transition-all hover:scale-105"
+          >
+            <CreditCard size={16} />
+            <span>Monthly Subscription Bill</span>
+          </button>
+        </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8">

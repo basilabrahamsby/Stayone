@@ -126,7 +126,7 @@ const actions = [
     { id: "delete", label: "Delete", icon: <Trash2 size={14} className="text-red-500" /> },
 ];
 
-const PROTECTED_ROLES = ['admin'];
+const PROTECTED_ROLES = ['admin', 'owner / admin', 'property admin', 'owner', 'superadmin'];
 
 const RoleManagementTab = () => {
     const [form, setForm] = useState({ name: "", permissions: [] });

@@ -6,14 +6,17 @@ import json
 class RoleBase(BaseModel):
     name: str
     permissions: Optional[List[str]] = []
+    branch_id: Optional[int] = None
 
 class RoleCreate(RoleBase):
     permissions: Optional[str] = None # Accept as string from frontend
+    branch_id: Optional[int] = None
 
 class RoleOut(RoleBase):
     id: int
     name: str
     permissions: Optional[List[str]] = None
+    branch_id: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
 
     @field_validator('permissions', mode='before')

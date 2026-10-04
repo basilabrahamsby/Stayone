@@ -39,6 +39,11 @@ def create_cleaning_service_request(db: Session, room_id: int, room_number: str,
     Create a cleaning service request after checkout.
     This is automatically triggered when a room is checked out.
     """
+    if not branch_id:
+        room = db.query(Room).filter(Room.id == room_id).first()
+        if room and room.branch_id:
+            branch_id = room.branch_id
+
     request = ServiceRequest(
         food_order_id=None,  # Cleaning requests don't have food orders
         room_id=room_id,
@@ -69,14 +74,17 @@ def create_refill_service_request(db: Session, room_id: int, room_number: str, g
     import json
     refill_items = []
     
+    # Get the room to access its inventory location and branch
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not branch_id and room and room.branch_id:
+        branch_id = room.branch_id
+
     # Get refill requirements from checkout verification if checkout_id is provided
     if checkout_id:
         from app.models.checkout import CheckoutVerification, CheckoutRequest as CheckoutRequestModel
         from app.models.inventory import InventoryItem, AssetMapping, InventoryCategory
         from app.models.room import Room
         
-        # Get the room to access its inventory location
-        room = db.query(Room).filter(Room.id == room_id).first()
         if not room or not room.inventory_location_id:
             return None  # No refill needed if room has no inventory location
         
@@ -181,6 +189,11 @@ def create_return_items_service_request(db: Session, room_id: int, room_number: 
     import json
     return_items = []
     
+    if not branch_id:
+        room = db.query(Room).filter(Room.id == room_id).first()
+        if room and room.branch_id:
+            branch_id = room.branch_id
+
     # Get items that need to be returned from checkout verification
     if checkout_id:
         from app.models.checkout import CheckoutVerification

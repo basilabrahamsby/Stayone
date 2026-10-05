@@ -2418,7 +2418,7 @@ export default function App() {
             });
 
             if (response.ok) {
-                showBannerMessage("success", "Room booking successful! We look forward to your stay.");
+                showBannerMessage("success", "Enquiry sent! Our team will contact you to confirm your reservation.");
                 setBookingData({ room_ids: [], guest_name: "", guest_mobile: "", guest_email: "", check_in: "", check_out: "", adults: 1, children: 0, num_rooms: 1 });
                 // Close the booking form after successful booking
                 setTimeout(() => {
@@ -2629,7 +2629,7 @@ export default function App() {
             });
 
             if (response.ok) {
-                showBannerMessage("success", "Package booking successful! We look forward to your stay.");
+                showBannerMessage("success", "Enquiry sent! Our team will contact you to confirm your package reservation.");
                 setPackageBookingData({ package_id: null, room_ids: [], guest_name: "", guest_mobile: "", guest_email: "", check_in: "", check_out: "", adults: 1, children: 0, num_rooms: 1, food_preferences: "", special_requests: "" });
                 // Close the booking form after successful booking
                 setTimeout(() => {
@@ -3010,9 +3010,9 @@ export default function App() {
                         {/* Desktop Navigation Menu */}
                         <nav className="hidden lg:flex items-center" style={{ gap: '0.25rem' }}>
                             {[
-                                { label: 'Properties', action: () => setSelectedBranch(null) },
                                 { label: 'Exclusive Deals', target: 'packages', type: 'id' },
                                 { label: 'Rooms', target: 'rooms-section', type: 'id' },
+                                { label: 'Properties', action: () => setSelectedBranch(null) },
                                 { label: 'Services', target: '[data-services-section]', type: 'selector' },
                                 { label: 'Food', target: '[data-food-section]', type: 'selector' },
                                 { label: 'Gallery', target: '[data-gallery-section]', type: 'selector' },
@@ -3115,9 +3115,9 @@ export default function App() {
                         <div className="lg:hidden absolute top-full left-0 right-0 shadow-xl" style={{ background: 'rgba(250,246,240,0.97)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(201,168,76,0.25)' }}>
                             <nav className="container mx-auto px-4 py-6" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                 {[
-                                    { label: 'Properties', action: () => setSelectedBranch(null) },
                                     { label: 'Exclusive Deals', target: 'packages', type: 'id' },
                                     { label: 'Rooms', target: 'rooms-section', type: 'id' },
+                                    { label: 'Properties', action: () => setSelectedBranch(null) },
                                     { label: 'Services', target: '[data-services-section]', type: 'selector' },
                                     { label: 'Food', target: '[data-food-section]', type: 'selector' },
                                     { label: 'Gallery', target: '[data-gallery-section]', type: 'selector' },
@@ -3365,92 +3365,6 @@ export default function App() {
                             </button>
                         )}
                     </div>
-
-                    {/* ── Property Hub (Destinations) Section ── */}
-                    <section id="properties"
-                        style={{
-                            padding: '2rem 1.5rem',
-                            background: 'radial-gradient(circle at 50% -20%, #ffffff 0%, #faf9f6 100%)',
-                            position: 'relative',
-                            borderBottom: '1px solid rgba(201,168,76,0.1)'
-                        }}>
-                        <div className="max-w-7xl mx-auto">
-                            <div className="text-center mb-6 animate-fade-in">
-                                <div className="section-badge mb-2 mx-auto" style={{ letterSpacing: '0.25em', padding: '0.2rem 0.6rem', fontSize: '10px' }}>Our Destinations</div>
-                                <h2 className="section-title mb-2" style={{ fontSize: 'clamp(1.5rem, 3.5vw, 2.25rem)', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>
-                                    {selectedBranch ? 'Switch Property' : 'Choose Your Sanctuary'}
-                                </h2>
-                                <p className="section-subtitle max-w-2xl mx-auto text-gray-500 font-light italic" style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.88rem)', fontFamily: 'var(--font-serif)' }}>
-                                    {selectedBranch
-                                        ? `You are currently viewing ${selectedBranch.name}. Select another property to explore.`
-                                        : 'Discover our handpicked collection of luxury resorts, each offering a distinct atmosphere.'}
-                                </p>
-                                <div className="w-10 h-0.5 bg-amber-500/20 mx-auto mt-4"></div>
-                            </div>
-
-                            <div className={`grid grid-cols-1 gap-6 ${branches.length === 1 ? 'max-w-md mx-auto' : branches.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
-                                {branches.map((branch, idx) => (
-                                    <div
-                                        key={branch.id}
-                                        className={`group cursor-pointer animate-fade-in-up transition-all duration-700 overflow-hidden rounded-3xl shadow-md border border-transparent ${selectedBranch?.id === branch.id
-                                            ? 'ring-2 ring-amber-500 ring-offset-2 scale-[1.01] shadow-2xl z-10'
-                                            : 'hover:scale-[1.02] hover:shadow-2xl hover:border-amber-500/10'
-                                            }`}
-                                        style={{
-                                            animationDelay: `${idx * 150}ms`,
-                                            background: '#ffffff'
-                                        }}
-                                        onClick={() => {
-                                            setSelectedBranch(branch);
-                                            setTimeout(() => {
-                                                const el = document.getElementById('packages');
-                                                if (el) el.scrollIntoView({ behavior: 'smooth' });
-                                            }, 400);
-                                        }}
-                                    >
-                                        <div className="aspect-[21/9] overflow-hidden relative">
-                                            <img
-                                                src={branch.image_url ? getImageUrl(branch.image_url) : [
-                                                    "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800",
-                                                    "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&q=80&w=800",
-                                                    "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&q=80&w=800",
-                                                    "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&q=80&w=800",
-                                                    "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&q=80&w=800",
-                                                    "https://images.unsplash.com/photo-1530521954074-e64f6810b32d?auto=format&fit=crop&q=80&w=800",
-                                                ][idx % 6]}
-                                                alt={branch.name}
-                                                loading="lazy"
-                                                decoding="async"
-                                                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                                            />
-                                            {/* Refined Overlay Gradient */}
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-                                            {selectedBranch?.id === branch.id && (
-                                                <div className="absolute top-5 right-5">
-                                                    <div className="bg-amber-500/90 backdrop-blur-md text-white text-[9px] tracking-[0.2em] uppercase font-bold px-4 py-1.5 rounded-full shadow-xl ring-1 ring-white/30 animate-pulse">
-                                                        Active
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="absolute bottom-6 left-6 right-6">
-                                                <h3 className="text-xl md:text-2xl font-display text-white uppercase tracking-widest mb-1 shadow-sm">{branch.name}</h3>
-                                                <div className="flex items-center gap-1.5 text-white/80 text-[10px] md:text-xs font-body mb-3">
-                                                    <MapPin className="w-3 h-3 text-amber-400" />
-                                                    <span className="tracking-wide">{renderLocationLink(branch, "Exclusive Destination")}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-amber-400 text-[9px] uppercase tracking-[0.2em] font-bold opacity-0 group-hover:opacity-100 transform translate-y-3 group-hover:translate-y-0 transition-all duration-500">
-                                                    <span>Explore Sanctuary</span>
-                                                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1.5 transition-transform" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </section>
 
                     {/* ── Exclusive Deals (Packages) ───────────────────────── */}
                     <section id="packages" style={{ position: 'relative', backgroundColor: '#faf9f6', paddingTop: '3.5rem', paddingBottom: '6rem', overflow: 'hidden' }}>
@@ -3826,6 +3740,93 @@ export default function App() {
 
                         </div>
                     </section >
+
+                    {/* ── Property Hub (Destinations) Section ── */}
+                    <section id="properties"
+                        style={{
+                            padding: '3rem 1.5rem',
+                            background: 'radial-gradient(circle at 50% -20%, #ffffff 0%, #faf9f6 100%)',
+                            position: 'relative',
+                            borderTop: '1px solid rgba(201,168,76,0.15)',
+                            borderBottom: '1px solid rgba(201,168,76,0.15)'
+                        }}>
+                        <div className="max-w-7xl mx-auto">
+                            <div className="text-center mb-6 animate-fade-in">
+                                <div className="section-badge mb-2 mx-auto" style={{ letterSpacing: '0.25em', padding: '0.2rem 0.6rem', fontSize: '10px' }}>Our Destinations</div>
+                                <h2 className="section-title mb-2" style={{ fontSize: 'clamp(1.5rem, 3.5vw, 2.25rem)', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>
+                                    {selectedBranch ? 'Switch Property' : 'Choose Your Sanctuary'}
+                                </h2>
+                                <p className="section-subtitle max-w-2xl mx-auto text-gray-500 font-light italic" style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.88rem)', fontFamily: 'var(--font-serif)' }}>
+                                    {selectedBranch
+                                        ? `You are currently viewing ${selectedBranch.name}. Select another property to explore.`
+                                        : 'Discover our handpicked collection of luxury resorts, each offering a distinct atmosphere.'}
+                                </p>
+                                <div className="w-10 h-0.5 bg-amber-500/20 mx-auto mt-4"></div>
+                            </div>
+
+                            <div className={`grid grid-cols-1 gap-6 ${branches.length === 1 ? 'max-w-md mx-auto' : branches.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
+                                {branches.map((branch, idx) => (
+                                    <div
+                                        key={branch.id}
+                                        className={`group cursor-pointer animate-fade-in-up transition-all duration-700 overflow-hidden rounded-3xl shadow-md border border-transparent ${selectedBranch?.id === branch.id
+                                            ? 'ring-2 ring-amber-500 ring-offset-2 scale-[1.01] shadow-2xl z-10'
+                                            : 'hover:scale-[1.02] hover:shadow-2xl hover:border-amber-500/10'
+                                            }`}
+                                        style={{
+                                            animationDelay: `${idx * 150}ms`,
+                                            background: '#ffffff'
+                                        }}
+                                        onClick={() => {
+                                            setSelectedBranch(branch);
+                                            setTimeout(() => {
+                                                const el = document.getElementById('rooms-section') || document.getElementById('packages');
+                                                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                            }, 400);
+                                        }}
+                                    >
+                                        <div className="aspect-[21/9] overflow-hidden relative">
+                                            <img
+                                                src={branch.image_url ? getImageUrl(branch.image_url) : [
+                                                    "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800",
+                                                    "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&q=80&w=800",
+                                                    "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&q=80&w=800",
+                                                    "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&q=80&w=800",
+                                                    "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&q=80&w=800",
+                                                    "https://images.unsplash.com/photo-1530521954074-e64f6810b32d?auto=format&fit=crop&q=80&w=800",
+                                                ][idx % 6]}
+                                                alt={branch.name}
+                                                loading="lazy"
+                                                decoding="async"
+                                                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                                            />
+                                            {/* Refined Overlay Gradient */}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                                            {selectedBranch?.id === branch.id && (
+                                                <div className="absolute top-5 right-5">
+                                                    <div className="bg-amber-500/90 backdrop-blur-md text-white text-[9px] tracking-[0.2em] uppercase font-bold px-4 py-1.5 rounded-full shadow-xl ring-1 ring-white/30 animate-pulse">
+                                                        Active
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="absolute bottom-6 left-6 right-6">
+                                                <h3 className="text-xl md:text-2xl font-display text-white uppercase tracking-widest mb-1 shadow-sm">{branch.name}</h3>
+                                                <div className="flex items-center gap-1.5 text-white/80 text-[10px] md:text-xs font-body mb-3">
+                                                    <MapPin className="w-3 h-3 text-amber-400" />
+                                                    <span className="tracking-wide">{renderLocationLink(branch, "Exclusive Destination")}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-amber-400 text-[9px] uppercase tracking-[0.2em] font-bold opacity-0 group-hover:opacity-100 transform translate-y-3 group-hover:translate-y-0 transition-all duration-500">
+                                                    <span>Explore Sanctuary</span>
+                                                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1.5 transition-transform" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
 
                     {/* Signature Experiences Section - Resort Style */}
                     < section style={{ position: 'relative', backgroundColor: '#faf9f6', paddingTop: '3.5rem', paddingBottom: '3.5rem', overflow: 'hidden' }}>
@@ -5256,7 +5257,7 @@ export default function App() {
                                         </div>
                                     </div>
                                     <button type="submit" className={`w-full py-3 rounded-full ${theme.buttonBg} ${theme.buttonText} font-bold shadow-lg ${theme.buttonHover} transition-colors disabled:opacity-50`} disabled={isBookingLoading}>
-                                        {isBookingLoading ? 'Booking...' : 'Confirm Booking'}
+                                        {isBookingLoading ? 'Sending...' : 'Send Enquiry'}
                                     </button>
                                     {bookingMessage.text && (
                                         <div className={`mt-4 p-3 rounded-xl text-center ${bookingMessage.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
@@ -5585,7 +5586,7 @@ export default function App() {
                                         );
                                     })()}
                                     <button type="submit" className={`w-full py-3 rounded-full ${theme.buttonBg} ${theme.buttonText} font-bold shadow-lg ${theme.buttonHover} transition-colors disabled:opacity-50`} disabled={isBookingLoading}>
-                                        {isBookingLoading ? 'Booking...' : 'Confirm Booking'}
+                                        {isBookingLoading ? 'Sending...' : 'Send Enquiry'}
                                     </button>
                                     {bookingMessage.text && (
                                         <div className={`mt-4 p-3 rounded-xl text-center ${bookingMessage.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>

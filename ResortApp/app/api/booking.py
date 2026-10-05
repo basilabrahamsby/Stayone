@@ -68,6 +68,8 @@ def confirm_booking(
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     
+    was_pending = booking.status.lower() == "pending"
+    
     booking.is_confirmed = True
     booking.confirmed_at = get_ist_now()
     
@@ -101,15 +103,20 @@ def confirm_booking(
     booking.advance_deposit = (booking.advance_deposit or 0.0) + total_advance
     booking.confirmation_notes = confirm_data.notes
     
-    # Ensure status is 'booked' (Confirmed) if it wasn't
+    # Promote enquiry (pending) to confirmed booking
     if booking.status.lower() == "pending":
         booking.status = "booked"
+        # If direct room assignments exist, now update their status to Booked
+        if was_pending and booking.booking_rooms:
+            from app.models.room import Room as RoomModel
+            for br in booking.booking_rooms:
+                room = db.query(RoomModel).filter(RoomModel.id == br.room_id).first()
+                if room:
+                    room.status = "Booked"
     
     db.commit()
     db.refresh(booking)
     
-    # Reload with relationships for response if needed, 
-    # but BookingOut should handle it.
     return booking
 
 @router.get("/{booking_id}/receipt")
@@ -202,9 +209,10 @@ def get_bookings(
             (Booking.status.ilike('checked-in'), 1),
             (Booking.status.ilike('booked'), 2),
             (Booking.status.ilike('confirmed'), 2),
-            (Booking.status.ilike('checked-out'), 3),
-            (Booking.status.ilike('cancelled'), 4),
-            else_=5
+            (Booking.status.ilike('pending'), 3),  # Enquiries show prominently
+            (Booking.status.ilike('checked-out'), 4),
+            (Booking.status.ilike('cancelled'), 5),
+            else_=6
         )
 
         if order_by == "id" and order == "desc":
@@ -1260,13 +1268,25 @@ def create_booking(
 
     return booking_full
 
-@router.post("/guest", response_model=BookingOut, summary="Create a booking as a guest")
+@router.post("/guest", response_model=BookingOut, summary="Create a booking enquiry as a guest")
 def create_guest_booking(booking: BookingCreate, background_tasks: BackgroundTasks = None, db: Session = Depends(get_db), branch_id_query: int = Query(1, alias="branch_id")):
     try:
-        # Similar to create_booking but for public access
+        # Guest bookings are treated as enquiries (status=pending).
+        # Room inventory is only affected when admin/staff confirms the booking.
         booking.branch_id = booking.branch_id if booking.branch_id is not None else branch_id_query
         booking.source = "Guest"
-        return create_booking(booking, background_tasks=background_tasks, db=db, current_user=None, branch_id=booking.branch_id)
+        result = create_booking(booking, background_tasks=background_tasks, db=db, current_user=None, branch_id=booking.branch_id)
+        
+        # Downgrade status to 'pending' — this is an enquiry, not a confirmed booking.
+        # Room inventory is NOT affected until admin/staff confirms via the confirm endpoint.
+        downgrade_query = db.query(Booking).filter(Booking.id == result.id)
+        db_booking = downgrade_query.first()
+        if db_booking and db_booking.status.lower() != "pending":
+            db_booking.status = "pending"
+            db.commit()
+            db.refresh(db_booking)
+            return db_booking
+        return result
     except HTTPException:
         # Re-raise HTTP exceptions (like validation errors) as-is
         raise

@@ -48,6 +48,8 @@ def confirm_package_booking(
     if not booking:
         raise HTTPException(status_code=404, detail="Package booking not found")
     
+    was_pending = booking.status.lower() == "pending"
+    
     booking.is_confirmed = True
     booking.confirmed_at = get_ist_now()
     
@@ -81,9 +83,15 @@ def confirm_package_booking(
     booking.advance_deposit = (booking.advance_deposit or 0.0) + total_advance
     booking.confirmation_notes = confirm_data.notes
     
-    # Ensure status is 'booked' (Confirmed) if it wasn't
+    # Promote enquiry (pending) to confirmed booking
     if booking.status.lower() == "pending":
         booking.status = "booked"
+        # Now that admin has confirmed, update physical room statuses
+        if was_pending and booking.rooms:
+            for pbr in booking.rooms:
+                room = db.query(Room).filter(Room.id == pbr.room_id).first()
+                if room:
+                    room.status = "Booked"
     
     db.commit()
     db.refresh(booking)
@@ -481,7 +489,9 @@ def book_package_guest_api(
         # Prioritize branch_id from the JSON body
         branch_id = booking.branch_id
         
-        result = crud_package.book_package(db, booking, branch_id=branch_id)
+        # Guest bookings from userend are treated as enquiries — is_guest_enquiry=True
+        # sets status='pending' and skips room status updates until admin confirms.
+        result = crud_package.book_package(db, booking, branch_id=branch_id, is_guest_enquiry=True)
         
         # Calculate booking charges and send confirmation email if email address is provided
         if result:

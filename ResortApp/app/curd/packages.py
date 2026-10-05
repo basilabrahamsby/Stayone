@@ -177,7 +177,7 @@ def get_or_create_guest_user(db: Session, email: str, mobile: str, name: str, br
         # Re-raise if we can't find existing user
         raise ValueError(f"Failed to create or find guest user: {str(e)}")
 
-def book_package(db: Session, booking: PackageBookingCreate, branch_id: int = None):
+def book_package(db: Session, booking: PackageBookingCreate, branch_id: int = None, is_guest_enquiry: bool = False):
     # If branch_id is not provided, try to derive it from the package or first room
     selected_package = db.query(Package).filter(Package.id == booking.package_id).first()
     if not selected_package:
@@ -316,6 +316,8 @@ def book_package(db: Session, booking: PackageBookingCreate, branch_id: int = No
         calc_total_amount = selected_package.price * stay_nights
 
     # All conflict checks passed - now create the booking
+    # Guest bookings from userend are treated as enquiries (pending) until admin accepts.
+    booking_status = "pending" if is_guest_enquiry else "booked"
     db_booking = PackageBooking(
         package_id=booking.package_id,
         check_in=booking.check_in,
@@ -325,7 +327,7 @@ def book_package(db: Session, booking: PackageBookingCreate, branch_id: int = No
         guest_mobile=guest_mobile or booking.guest_mobile or None,  # Use normalized mobile or original, fallback to None
         adults=booking.adults,
         children=booking.children,
-        status="booked",
+        status=booking_status,
         user_id=guest_user_id,  # Link booking to guest user
         food_preferences=booking.food_preferences,
         special_requests=booking.special_requests,
@@ -343,12 +345,15 @@ def book_package(db: Session, booking: PackageBookingCreate, branch_id: int = No
     db.refresh(db_booking)
 
     # Assign multiple rooms (conflicts already checked, safe to proceed)
+    # For guest enquiries, rooms are linked but NOT marked as Booked yet.
+    # Room status is only updated when admin/staff confirms the enquiry.
     if booking.room_ids:
         for room_id in booking.room_ids:
-            # Update the room's status to 'Booked'
-            room_to_update = db.query(Room).filter(Room.id == room_id).first()
-            if room_to_update:
-                room_to_update.status = "Booked"
+            if not is_guest_enquiry:
+                # Update the room's status to 'Booked' only for confirmed bookings
+                room_to_update = db.query(Room).filter(Room.id == room_id).first()
+                if room_to_update:
+                    room_to_update.status = "Booked"
 
             db_room_link = PackageBookingRoom(package_booking_id=db_booking.id, room_id=room_id, branch_id=branch_id)
             db.add(db_room_link)

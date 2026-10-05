@@ -139,10 +139,10 @@ const BookingStatusBadge = React.memo(({ status, isPackage, packageName, isConfi
       dot: "bg-slate-500"
     },
     pending: {
-      label: "Pending",
+      label: "Enquiry",
       icon: Clock,
-      className: "bg-amber-50 text-amber-600 border-amber-100",
-      dot: "bg-amber-500"
+      className: "bg-orange-50 text-orange-600 border-orange-200 animate-pulse",
+      dot: "bg-orange-500"
     }
   };
 
@@ -2123,10 +2123,14 @@ const ConfirmBookingModal = ({
               <CheckCircle2 className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h2 className="text-3xl font-bold text-slate-800 tracking-tight uppercase leading-none mb-2">Confirm Booking</h2>
+              <h2 className="text-3xl font-bold text-slate-800 tracking-tight uppercase leading-none mb-2">
+                {booking?.status?.toLowerCase() === "pending" ? "Accept Enquiry" : "Confirm Booking"}
+              </h2>
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-normal">Recording Advance Payment</span>
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-normal">
+                  {booking?.status?.toLowerCase() === "pending" ? "Accepting Guest Enquiry — Record Advance" : "Recording Advance Payment"}
+                </span>
               </div>
             </div>
           </div>
@@ -2302,7 +2306,7 @@ const ConfirmBookingModal = ({
             ) : (
               <CheckCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
             )}
-            <span>Confirm Booking</span>
+          <span>{booking?.status?.toLowerCase() === "pending" ? "Accept Enquiry" : "Confirm Booking"}</span>
           </button>
         </div>
       </motion.div>
@@ -7231,13 +7235,19 @@ const Bookings = () => {
                                     <FileText className="w-5 h-5" />
                                   </button>
                                 )}
-                                {hasPermission('bookings:edit') && (b.status?.toLowerCase().replace(/[-_]/g, "") === "booked" || b.status?.toLowerCase().replace(/[-_]/g, "") === "checkedin") && (
+                                {hasPermission('bookings:edit') && (
+                                  (b.status?.toLowerCase().replace(/[-_]/g, "") === "booked" || b.status?.toLowerCase().replace(/[-_]/g, "") === "checkedin" || b.status?.toLowerCase() === "pending")
+                                ) && (
                                   <button
                                     onClick={() => setBookingToConfirm(b)}
-                                    className="w-10 h-10 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl border-2 border-emerald-100 hover:border-emerald-600 transition-all shadow-sm flex items-center justify-center"
-                                    title="Confirm Booking"
+                                    className={`w-10 h-10 rounded-xl border-2 transition-all shadow-sm flex items-center justify-center ${
+                                      b.status?.toLowerCase() === "pending"
+                                        ? "bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white border-orange-200 hover:border-orange-500"
+                                        : "bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white border-emerald-100 hover:border-emerald-600"
+                                    }`}
+                                    title={b.status?.toLowerCase() === "pending" ? "Accept Enquiry" : "Confirm Booking"}
                                   >
-                                    <CheckCircle2 className="w-5 h-5" />
+                                    {b.status?.toLowerCase() === "pending" ? <CheckCircle2 className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
                                   </button>
                                 )}
                                 {hasPermission('bookings:edit') && (
